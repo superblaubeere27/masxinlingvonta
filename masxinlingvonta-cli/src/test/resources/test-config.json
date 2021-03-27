@@ -1,0 +1,9 @@
+{
+  "additionalMethodsToCompile": [
+    {
+      "owner": "Test",
+      "name": "test",
+      "desc": "()V"
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>net.superblaubeere27</groupId>
+    <artifactId>masxinlingvonta</artifactId>
+    <packaging>pom</packaging>
+    <version>1.0-SNAPSHOT</version>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>10</source>
+                    <target>10</target>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+    <modules>
+        <module>masxinlingvonta-annotations</module>
+        <module>masxinlingvonta-core</module>
+        <module>masxinlingvonta-test</module>
+        <module>masxinlingvonta-cli</module>
+    </modules>
+
+    <properties>
+        <maven.MLVCompiler.source>11</maven.MLVCompiler.source>
+        <maven.MLVCompiler.target>11</maven.MLVCompiler.target>
+        <asm.version>9.1</asm.version>
+    </properties>
+
+    <repositories>
+        <repository>
+            <id>ObjectWeb</id>
+            <url>https://repository.ow2.org/nexus/content/repositories/releases/</url>
+        </repository>
+    </repositories>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm</artifactId>
+            <version>${asm.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm-tree</artifactId>
+            <version>${asm.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm-analysis</artifactId>
+            <version>${asm.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.bytedeco</groupId>
+            <artifactId>llvm-platform</artifactId>
+            <version>11.1.0-1.5.5</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.pcj</groupId>
+            <artifactId>google-options</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+    </dependencies>
+
+</project>
