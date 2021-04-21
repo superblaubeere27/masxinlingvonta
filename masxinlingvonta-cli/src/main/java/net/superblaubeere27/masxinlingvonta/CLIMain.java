@@ -1,4 +1,4 @@
-package net.superblaubeere27.masxinlingvont;
+package net.superblaubeere27.masxinlingvonta;
 
 import com.google.gson.Gson;
 import net.superblaubeere27.masxinlingvaj.MLV;
@@ -195,21 +195,21 @@ public class CLIMain {
                 linkerProcess = new ProcessBuilder(getFilePath(llvmBasePath, "lld-link"),
                                                    "/dll",
                                                    "/noentry",
-                                                   "/out:\"" + getFilePath(outputDir, "mlv.dll") + "\"",
+                                                   "/out:\"" + getFilePath(outputDir, "mlv-win64.dll") + "\"",
                                                    tmpObjFile.getAbsolutePath()
                 ).start();
             } else if (os == OS.LINUX) {
                 linkerProcess = new ProcessBuilder(getFilePath(llvmBasePath, "ld.lld"),
                                                    "-shared",
                                                    "-o",
-                                                   getFilePath(outputDir, "libmlv.so"),
+                                                   getFilePath(outputDir, "mlv-linux64.dll"),
                                                    tmpObjFile.getAbsolutePath()
                 ).start();
             } else if (os == OS.MAC) {
                 linkerProcess = new ProcessBuilder(getFilePath(llvmBasePath, "ld64.lld"),
                                                    "-dylib",
                                                    "-o",
-                                                   getFilePath(outputDir, "libmlv.dylib"),
+                                                   getFilePath(outputDir, "mlv-macosx.dll"),
                                                    tmpObjFile.getAbsolutePath()
                 ).start();
             } else {
