@@ -620,7 +620,7 @@ public class CodeConverter implements Opcodes {
         if (currentType == null)
             type = JNIType.OBJECT;
         else
-            type = compiler.getJni().toNativeType(currentType);
+            type = compiler.getJni().toNativeType(currentType).getStackStorageType();
         return type;
     }
 
