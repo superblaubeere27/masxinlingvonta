@@ -99,8 +99,8 @@ public class StaticFieldInstruction extends Instruction {
                     classId,
                     field,
                     translatedMethod.getStack().buildStackTypeFixedStackLoad(translatedMethod.getLlvmBuilder(),
-                            this.stackTarget,
-                            this.targetType)
+                                                                             this.stackTarget,
+                                                                             this.targetType, false)
             );
         } else {
             var retrievedField = compiler.getJni().getJniEnv().callEnvironmentMethod(
@@ -111,8 +111,9 @@ public class StaticFieldInstruction extends Instruction {
             );
 
             translatedMethod.getStack().buildStackStore(translatedMethod.getLlvmBuilder(),
-                    this.stackTarget,
-                    retrievedField);
+                                                        this.stackTarget,
+                                                        retrievedField,
+                                                        true);
         }
 
         // Did an exception occur?

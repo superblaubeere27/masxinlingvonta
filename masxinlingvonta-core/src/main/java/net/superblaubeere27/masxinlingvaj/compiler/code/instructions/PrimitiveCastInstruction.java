@@ -31,10 +31,10 @@ public class PrimitiveCastInstruction extends Instruction implements Opcodes {
         switch (opcode) {
             case I2L: // visitInsn
                 return new PrimitiveCastInstruction(new StackSlot(JNIType.INT, idx),
-                        new StackSlot(JNIType.INT, idx),
-                        JNIType.INT,
-                        JNIType.LONG,
-                        CastOperation.INT_CAST);
+                                                    new StackSlot(JNIType.LONG, idx),
+                                                    JNIType.INT,
+                                                    JNIType.LONG,
+                                                    CastOperation.INT_CAST);
             case I2F: // -
                 return new PrimitiveCastInstruction(new StackSlot(JNIType.INT, idx),
                         new StackSlot(JNIType.FLOAT, idx),
@@ -103,22 +103,22 @@ public class PrimitiveCastInstruction extends Instruction implements Opcodes {
                         CastOperation.FLOAT_CAST);
             case I2B: // -
                 return new PrimitiveCastInstruction(new StackSlot(JNIType.INT, idx),
-                        new StackSlot(JNIType.BYTE, idx),
-                        JNIType.INT,
-                        JNIType.BYTE,
-                        CastOperation.INT_CAST);
+                                                    new StackSlot(JNIType.INT, idx),
+                                                    JNIType.INT,
+                                                    JNIType.BYTE,
+                                                    CastOperation.INT_CAST);
             case I2C: // -
                 return new PrimitiveCastInstruction(new StackSlot(JNIType.INT, idx),
-                        new StackSlot(JNIType.CHAR, idx),
-                        JNIType.INT,
-                        JNIType.CHAR,
-                        CastOperation.INT_CAST);
+                                                    new StackSlot(JNIType.INT, idx),
+                                                    JNIType.INT,
+                                                    JNIType.CHAR,
+                                                    CastOperation.INT_CAST);
             case I2S: // -
                 return new PrimitiveCastInstruction(new StackSlot(JNIType.INT, idx),
-                        new StackSlot(JNIType.SHORT, idx),
-                        JNIType.INT,
-                        JNIType.SHORT,
-                        CastOperation.INT_CAST);
+                                                    new StackSlot(JNIType.INT, idx),
+                                                    JNIType.INT,
+                                                    JNIType.SHORT,
+                                                    CastOperation.INT_CAST);
             default:
                 throw new IllegalArgumentException();
         }
@@ -153,7 +153,7 @@ public class PrimitiveCastInstruction extends Instruction implements Opcodes {
                 throw new IllegalStateException("Unexpected value: " + this.castOperation);
         }
 
-        translatedMethod.getStack().buildStackStore(builder, this.outputSlot, result);
+        translatedMethod.getStack().buildStackStore(builder, this.outputSlot, result, true);
     }
 
     private enum CastOperation {

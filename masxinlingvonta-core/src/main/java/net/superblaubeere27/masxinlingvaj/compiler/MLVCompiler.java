@@ -28,6 +28,9 @@ public class MLVCompiler {
     private void createModule() {
         this.module = LLVMModuleCreateWithName("mlv");
         this.jni = new JNI(this.module);
+
+        var fltUsedConst = LLVM.LLVMAddGlobal(this.module, LLVM.LLVMInt32Type(), "_fltused");
+        LLVM.LLVMSetGlobalConstant(fltUsedConst, 1);
     }
 
     public void compileMethod(CompilerMethod method) throws AnalyzerException {

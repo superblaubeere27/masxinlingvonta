@@ -101,8 +101,8 @@ public class FieldInstruction extends Instruction {
                     translatedMethod.getStack().buildStackLoad(translatedMethod.getLlvmBuilder(), this.instance),
                     field,
                     translatedMethod.getStack().buildStackTypeFixedStackLoad(translatedMethod.getLlvmBuilder(),
-                            this.stackTarget,
-                            this.targetType)
+                                                                             this.stackTarget,
+                                                                             this.targetType, false)
             );
         } else {
             var retrievedField = compiler.getJni().getJniEnv().callEnvironmentMethod(

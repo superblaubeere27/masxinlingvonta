@@ -42,6 +42,7 @@ public class OpcodeUtils implements Opcodes {
             case AALOAD:
             case ALOAD:
             case ASTORE:
+            case AASTORE:
             case ARETURN:
                 return OBJECT_TYPE;
             case IALOAD:
@@ -142,7 +143,6 @@ public class OpcodeUtils implements Opcodes {
             case I2S:
                 return Type.SHORT_TYPE;
             case RETURN:
-            case AASTORE:
             case ATHROW:
             case MONITORENTER:
             case MONITOREXIT:

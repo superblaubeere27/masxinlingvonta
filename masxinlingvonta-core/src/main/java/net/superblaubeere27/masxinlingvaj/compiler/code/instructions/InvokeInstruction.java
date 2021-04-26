@@ -63,33 +63,36 @@ public class InvokeInstruction extends Instruction {
 
             for (int i = 0; i < this.params.length; i++) {
                 parameterValues[2 + i] = translatedMethod.getStack().buildStackTypeFixedStackLoad(translatedMethod.getLlvmBuilder(),
-                        this.params[i],
-                        this.targetTypes[i]);
+                                                                                                  this.params[i],
+                                                                                                  this.targetTypes[i],
+                                                                                                  true);
             }
         } else if (isNonVirtual) {
             parameterValues[0] = translatedMethod.getStack().buildStackTypeFixedStackLoad(translatedMethod.getLlvmBuilder(),
-                    this.params[0],
-                    this.targetTypes[0]);
+                                                                                          this.params[0],
+                                                                                          this.targetTypes[0], false);
             parameterValues[1] = classId;
             // methodID in params[3]
             parameterValues[2] = method;
 
             for (int i = 0; i < this.params.length - 1; i++) {
                 parameterValues[3 + i] = translatedMethod.getStack().buildStackTypeFixedStackLoad(translatedMethod.getLlvmBuilder(),
-                        this.params[i + 1],
-                        this.targetTypes[i + 1]);
+                                                                                                  this.params[i + 1],
+                                                                                                  this.targetTypes[i + 1],
+                                                                                                  true);
             }
         } else {
             parameterValues[0] = translatedMethod.getStack().buildStackTypeFixedStackLoad(translatedMethod.getLlvmBuilder(),
-                    this.params[0],
-                    this.targetTypes[0]);
+                                                                                          this.params[0],
+                                                                                          this.targetTypes[0], false);
             // methodID in params[1]
             parameterValues[1] = method;
 
             for (int i = 0; i < this.params.length - 1; i++) {
                 parameterValues[2 + i] = translatedMethod.getStack().buildStackTypeFixedStackLoad(translatedMethod.getLlvmBuilder(),
-                        this.params[i + 1],
-                        this.targetTypes[i + 1]);
+                                                                                                  this.params[i + 1],
+                                                                                                  this.targetTypes[i + 1],
+                                                                                                  true);
             }
         }
 

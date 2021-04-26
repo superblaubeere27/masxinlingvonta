@@ -155,19 +155,23 @@ public class CLIMain {
         System.out.println("Compiling for " + os + "...");
 
         try {
+            var link = true;
+
             {
                 Process compilerProcess;
 
                 if (os == OS.WINDOWS) {
                     compilerProcess = new ProcessBuilder(getFilePath(llvmBasePath, "clang"),
                                                          "-O3",
-                                                         "-c",
+                                                         "-shared",
                                                          "-target",
                                                          os.getTargetTriple(),
                                                          "-o",
-                                                         tmpObjFile.getAbsolutePath(),
+                                                         getFilePath(outputDir, "mlv-win64.dll"),
                                                          irInput.getAbsolutePath()
                     ).start();
+
+                    link = false;
                 } else if (os == OS.LINUX || os == OS.MAC) {
                     compilerProcess = new ProcessBuilder(getFilePath(llvmBasePath, "clang"),
                                                          "-O3",
@@ -189,27 +193,23 @@ public class CLIMain {
                     throw new IOException("Compiler returned a non-zero exit code: " + exitCode);
             }
 
+            if (!link)
+                return;
+
             Process linkerProcess;
 
-            if (os == OS.WINDOWS) {
-                linkerProcess = new ProcessBuilder(getFilePath(llvmBasePath, "lld-link"),
-                                                   "/dll",
-                                                   "/noentry",
-                                                   "/out:\"" + getFilePath(outputDir, "mlv-win64.dll") + "\"",
-                                                   tmpObjFile.getAbsolutePath()
-                ).start();
-            } else if (os == OS.LINUX) {
+            if (os == OS.LINUX) {
                 linkerProcess = new ProcessBuilder(getFilePath(llvmBasePath, "ld.lld"),
                                                    "-shared",
                                                    "-o",
-                                                   getFilePath(outputDir, "mlv-linux64.dll"),
+                                                   getFilePath(outputDir, "mlv-linux64.so"),
                                                    tmpObjFile.getAbsolutePath()
                 ).start();
             } else if (os == OS.MAC) {
                 linkerProcess = new ProcessBuilder(getFilePath(llvmBasePath, "ld64.lld"),
                                                    "-dylib",
                                                    "-o",
-                                                   getFilePath(outputDir, "mlv-macosx.dll"),
+                                                   getFilePath(outputDir, "mlv-macosx.dynlib"),
                                                    tmpObjFile.getAbsolutePath()
                 ).start();
             } else {
@@ -245,10 +245,12 @@ public class CLIMain {
         return new File(basePath, fileName).getAbsolutePath();
     }
 
+    @SuppressWarnings("unused")
     private static class MLVCLIConfig {
         private MLVMethod[] additionalMethodsToCompile;
     }
 
+    @SuppressWarnings("unused")
     private static class MLVMethod {
         private String owner;
         private String name;

@@ -79,8 +79,11 @@ public class TranslatedMethod {
         var paramStackIdx = 0;
 
         for (int i = 0; i < argumentTypes.length; i++) {
-            stack.buildLocalStore(builder, new StackSlot(jni.toNativeType(argumentTypes[i]), paramStackIdx),
-                    LLVM.LLVMGetParam(method, paramIdx + i));
+            stack.buildLocalStore(builder,
+                                  new StackSlot(jni.toNativeType(argumentTypes[i]).getStackStorageType(),
+                                                paramStackIdx),
+                                  LLVM.LLVMGetParam(method, paramIdx + i),
+                                  true);
 
             paramStackIdx += argumentTypes[i].getSize();
         }

@@ -40,7 +40,8 @@ public class MethodStack {
         }
 
         for (Type argumentType : Type.getArgumentTypes(this.method.getNode().desc)) {
-            ensureLocalAllocated(new StackSlot(compiler.getJni().toNativeType(argumentType), paramIndex), builder);
+            ensureLocalAllocated(new StackSlot(compiler.getJni().toNativeType(argumentType).getStackStorageType(),
+                                               paramIndex), builder);
 
             paramIndex += argumentType.getSize();
         }
@@ -85,7 +86,7 @@ public class MethodStack {
         var currentBB = LLVM.LLVMGetInsertBlock(builder);
 
         if (fixType) {
-            value = LLVM.LLVMBuildZExt(builder, value, stackSlot.getType().getLLVMType(), "");
+            value = fixType(builder, stackSlot, value);
         }
 
         LLVM.LLVMBuildStore(builder, value, getStack(stackSlot, currentBB, builder).getAllocatedValue());
@@ -97,22 +98,39 @@ public class MethodStack {
         return LLVM.LLVMBuildLoad(builder, getStack(stackSlot, currentBB, builder).getAllocatedValue(), "");
     }
 
-    public LLVMValueRef buildStackTypeFixedStackLoad(LLVMBuilderRef builder, StackSlot stackSlot, JNIType type) {
+    public LLVMValueRef buildStackTypeFixedStackLoad(LLVMBuilderRef builder, StackSlot stackSlot, JNIType type, boolean vararg) {
         var currentBB = LLVM.LLVMGetInsertBlock(builder);
 
         var value = LLVM.LLVMBuildLoad(builder, getStack(stackSlot, currentBB, builder).getAllocatedValue(), "");
 
-        value = LLVM.LLVMBuildTrunc(builder, value, type.getLLVMType(), "");
+        if (vararg && type == JNIType.FLOAT) {
+            if (LLVM.LLVMGetTypeKind(LLVM.LLVMTypeOf(value)) == LLVM.LLVMFloatTypeKind)
+                value = LLVM.LLVMBuildFPExt(builder, value, LLVM.LLVMDoubleType(), "vararg_fix");
+        } else {
+            value = LLVM.LLVMBuildTrunc(builder, value, type.getLLVMType(), "");
+        }
+
 
         return value;
     }
 
-    public void buildLocalStore(LLVMBuilderRef builder, StackSlot stackSlot, LLVMValueRef value) {
+    public void buildLocalStore(LLVMBuilderRef builder, StackSlot stackSlot, LLVMValueRef value, boolean fixTypes) {
+        if (fixTypes)
+            value = fixType(builder, stackSlot, value);
+
         LLVM.LLVMBuildStore(builder, value, this.locals.get(stackSlot).getAllocatedValue());
+    }
+
+    public void buildLocalStore(LLVMBuilderRef builder, StackSlot stackSlot, LLVMValueRef value) {
+        this.buildLocalStore(builder, stackSlot, value, true);
     }
 
     public LLVMValueRef buildLocalLoad(LLVMBuilderRef builder, StackSlot stackSlot) {
         return LLVM.LLVMBuildLoad(builder, this.locals.get(stackSlot).getAllocatedValue(), "");
+    }
+
+    private LLVMValueRef fixType(LLVMBuilderRef builder, StackSlot stackSlot, LLVMValueRef value) {
+        return LLVM.LLVMBuildZExt(builder, value, stackSlot.getType().getLLVMType(), "");
     }
 
     public LLVMBasicBlockRef getAllocationsBlock() {

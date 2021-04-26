@@ -596,9 +596,9 @@ public class CodeConverter implements Opcodes {
                 return new MonitorInstruction(new StackSlot(JNIType.OBJECT, stackFrame.getStackSize() - 1),
                                               opcode == MONITORENTER);
 //            case MULTIANEWARRAY: // visitMultiANewArrayInsn
-            default:
-                throw new IllegalArgumentException("Unknown opcode");
         }
+
+        throw new IllegalArgumentException("Unknown opcode");
     }
 
     private static JNIType getStackFrameType(MLVCompiler compiler, SourceValue stack) {
@@ -607,7 +607,7 @@ public class CodeConverter implements Opcodes {
         for (AbstractInsnNode insn : stack.insns) {
             Type t = OpcodeUtils.getReturnType(insn);
 
-            if (currentType == null || t.equals(currentType)) {
+            if (currentType == null || t.getSort() == currentType.getSort()) {
                 currentType = t;
             } else {
                 throw new IllegalArgumentException("Can't merge two types :/");
