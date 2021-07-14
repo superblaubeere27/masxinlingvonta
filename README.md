@@ -15,7 +15,7 @@ You can simply build this project with one simple command:
 
 `mvn -Djavacpp.platform=<HOST-PLATFORM> clean package`
 
-The `HOST-PLATFORM` is the platform you want run this tool on, **NOT** the platform the compile code should run on.
+The `HOST-PLATFORM` is the platform you want to run this tool on, **NOT** the platform the compile code should run on.
 Supported host targets: `windows-x86_64`, `linux-x86_64`, `macosx-x86_64`
 
 ## Features
