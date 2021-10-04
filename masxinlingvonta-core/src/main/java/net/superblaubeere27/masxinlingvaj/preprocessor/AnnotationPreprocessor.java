@@ -17,7 +17,7 @@ public class AnnotationPreprocessor extends AbstractPreprocessor {
     private MLVCompiler compiler;
 
     @Override
-    public void init(MLVCompiler compiler, CompilerPreprocessor preprocessor) throws Exception {
+    public void init(MLVCompiler compiler, CompilerPreprocessor preprocessor) {
         this.compiler = compiler;
     }
 
@@ -27,22 +27,28 @@ public class AnnotationPreprocessor extends AbstractPreprocessor {
 
         if (methodNode.invisibleAnnotations != null) {
             for (AnnotationNode invisibleAnnotation : methodNode.invisibleAnnotations) {
-                processAnnotation(method, preprocessor, invisibleAnnotation);
+                processAnnotation(method, preprocessor, invisibleAnnotation, true);
             }
         }
 
         if (methodNode.visibleAnnotations != null) {
             for (AnnotationNode invisibleAnnotation : methodNode.visibleAnnotations) {
-                processAnnotation(method, preprocessor, invisibleAnnotation);
+                processAnnotation(method, preprocessor, invisibleAnnotation, false);
             }
         }
     }
 
-    private void processAnnotation(CompilerMethod method, CompilerPreprocessor preprocessor, AnnotationNode annotation) {
+    private void processAnnotation(CompilerMethod method, CompilerPreprocessor preprocessor, AnnotationNode annotation, boolean isVisible) {
         if (annotation.desc.equals(OUTSOURCE_ANNOTATION_TYPE)) {
             preprocessor.markForCompilation(method);
 
             findLambdas(method, preprocessor);
+
+            if (isVisible) {
+                method.getNode().visibleAnnotations.remove(annotation);
+            }else {
+                method.getNode().invisibleAnnotations.remove(annotation);
+            }
         }
     }
 
