@@ -1,15 +1,16 @@
 package net.superblaubeere27.masxinlingvaj.postprocessor;
 
-import net.superblaubeere27.masxinlingvaj.compiler.MLVCompiler;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import net.superblaubeere27.masxinlingvaj.compiler.MLVCompiler;
+
 public class CompilerPostprocessor {
     private static final List<AbstractPostprocessor> PREPROCESSORS = Arrays.asList(
 //            new LambdaPrecompiler(),
-            new StandardPostProcessor()
+            new StandardPostProcessor(),
+            new LoaderAdderPostprocessor()
     );
 
     private final ArrayList<AbstractPostprocessor> preprocessors;

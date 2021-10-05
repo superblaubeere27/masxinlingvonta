@@ -1,5 +1,8 @@
 package net.superblaubeere27.masxinlingvaj.preprocessor;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import net.superblaubeere27.masxinlingvaj.compiler.MLVCompiler;
 import net.superblaubeere27.masxinlingvaj.compiler.tree.CompilerMethod;
 import net.superblaubeere27.masxinlingvonta.annotation.Outsource;
@@ -17,7 +20,7 @@ public class AnnotationPreprocessor extends AbstractPreprocessor {
     private MLVCompiler compiler;
 
     @Override
-    public void init(MLVCompiler compiler, CompilerPreprocessor preprocessor) throws Exception {
+    public void init(MLVCompiler compiler, CompilerPreprocessor preprocessor) {
         this.compiler = compiler;
     }
 
@@ -25,25 +28,35 @@ public class AnnotationPreprocessor extends AbstractPreprocessor {
     public void preprocess(CompilerMethod method, CompilerPreprocessor preprocessor) throws Exception {
         var methodNode = method.getNode();
 
+        List<AnnotationNode> invisibleObfuscationAnnotations = new ArrayList<>();
+        List<AnnotationNode> visibleObfuscationAnnotations = new ArrayList<>();
+
         if (methodNode.invisibleAnnotations != null) {
             for (AnnotationNode invisibleAnnotation : methodNode.invisibleAnnotations) {
-                processAnnotation(method, preprocessor, invisibleAnnotation);
+                if (invisibleAnnotation.desc.equals(OUTSOURCE_ANNOTATION_TYPE)) {
+                    processAnnotation(method, preprocessor);
+                    invisibleObfuscationAnnotations.add(invisibleAnnotation);
+                }
             }
+
+            methodNode.invisibleAnnotations.removeAll(invisibleObfuscationAnnotations);
         }
 
         if (methodNode.visibleAnnotations != null) {
-            for (AnnotationNode invisibleAnnotation : methodNode.visibleAnnotations) {
-                processAnnotation(method, preprocessor, invisibleAnnotation);
+            for (AnnotationNode visibleAnnotations : methodNode.visibleAnnotations) {
+                if (visibleAnnotations.desc.equals(OUTSOURCE_ANNOTATION_TYPE)) {
+                    processAnnotation(method, preprocessor);
+                    visibleObfuscationAnnotations.add(visibleAnnotations);
+                }
             }
+
+            methodNode.visibleAnnotations.removeAll(visibleObfuscationAnnotations);
         }
     }
 
-    private void processAnnotation(CompilerMethod method, CompilerPreprocessor preprocessor, AnnotationNode annotation) {
-        if (annotation.desc.equals(OUTSOURCE_ANNOTATION_TYPE)) {
-            preprocessor.markForCompilation(method);
-
-            findLambdas(method, preprocessor);
-        }
+    private void processAnnotation(CompilerMethod method, CompilerPreprocessor preprocessor) {
+        preprocessor.markForCompilation(method);
+        findLambdas(method, preprocessor);
     }
 
     private void findLambdas(CompilerMethod method, CompilerPreprocessor preprocessor) {
