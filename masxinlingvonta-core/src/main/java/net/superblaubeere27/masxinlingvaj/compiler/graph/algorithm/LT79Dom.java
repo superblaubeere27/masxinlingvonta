@@ -3,15 +3,12 @@ package net.superblaubeere27.masxinlingvaj.compiler.graph.algorithm;
 import net.superblaubeere27.masxinlingvaj.compiler.graph.*;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.NullPermeableHashMap;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Implementation of A Fast Algorithm for Finding Dominators in a Flowgraph by Lengauer and Tarjan, 1979
+ *
+ * @author maple-ir
  */
 public class LT79Dom<N extends FastGraphVertex, E extends FastGraphEdge<N>> {
 

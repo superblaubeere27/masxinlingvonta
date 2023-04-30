@@ -16,7 +16,7 @@ import java.util.Queue;
 
 /**
  * A simple fixed-point, worklist-based liveness analyser that supports both SSA and non-SSA flow graphs.
- * If your flow graph is already in SSA, you should use {@link DominanceLivenessAnalyser} instead.
+ * Code from maple-ir
  */
 public class SSABlockLivenessAnalyser implements Liveness<BasicBlock> {
     private final NullPermeableHashMap<BasicBlock, GenericBitSet<Local>> use;
