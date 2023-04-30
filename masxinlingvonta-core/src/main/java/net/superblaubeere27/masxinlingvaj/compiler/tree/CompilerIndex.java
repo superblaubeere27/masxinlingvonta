@@ -7,6 +7,7 @@ import org.objectweb.asm.tree.MethodInsnNode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Contains lookups for classes
@@ -17,12 +18,15 @@ public class CompilerIndex {
     private final HashMap<MethodOrFieldIdentifier, CompilerMethod> methodIndex = new HashMap<>();
     private final HashMap<MethodOrFieldIdentifier, CompilerField> fieldIndex = new HashMap<>();
 
-    public CompilerIndex(List<ClassNode> classNodes) {
-        this.classes = new ArrayList<>(classNodes.size());
+    public CompilerIndex(List<ClassNode> classNodes, ArrayList<ClassNode> libraryClasses) {
+        this.classes = new ArrayList<>(classNodes.size() + libraryClasses.size());
 
         // Create compiler classes from the ClassNodes
         for (ClassNode classNode : classNodes) {
             this.classes.add(new CompilerClass(classNode, false));
+        }
+        for (ClassNode classNode : libraryClasses) {
+            this.classes.add(new CompilerClass(classNode, true));
         }
 
         this.classIndex = new HashMap<>(this.classes.size());
@@ -33,12 +37,14 @@ public class CompilerIndex {
         }
     }
 
-    public void addGeneratedClass(ClassNode classNode) {
-        var cc = new CompilerClass(classNode, false, true);
+    public void addGeneratedClasses(ArrayList<ClassNode> classNode) {
+        var classes = classNode.stream().map(cn -> new CompilerClass(cn, false, true)).collect(Collectors.toList());
 
-        this.classes.add(cc);
+        this.classes.addAll(classes);
 
-        this.refreshClass(cc);
+        classes.forEach(this::refreshClass);
+
+        ClassHierarchyBuilder.addGeneratedClasses(this, classes);
     }
 
     public void refreshClass(CompilerClass cc) {
@@ -53,6 +59,10 @@ public class CompilerIndex {
         for (CompilerField method : cc.getFields()) {
             this.fieldIndex.put(method.getIdentifier(), method);
         }
+    }
+
+    public void buildHierarchy() {
+        ClassHierarchyBuilder.buildHierarchy(this);
     }
 
     public CompilerField getField(String owner, String name, String desc) {
@@ -71,6 +81,14 @@ public class CompilerIndex {
 
     public CompilerMethod getMethod(String owner, String name, String desc) {
         return this.methodIndex.get(new MethodOrFieldIdentifier(owner, name, desc));
+    }
+
+    public CompilerMethod getMethod(MethodOrFieldIdentifier target) {
+        return this.getMethod(target.getOwner(), target.getName(), target.getDesc());
+    }
+
+    public CompilerClass getClass(String name) {
+        return this.classIndex.get(name);
     }
 
     public ArrayList<CompilerClass> getClasses() {

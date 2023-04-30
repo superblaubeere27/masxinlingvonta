@@ -21,7 +21,7 @@ public class OutputWriter {
                 continue;
             }
 
-            ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+            ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
 
             aClass.getClassNode().accept(classWriter);
 

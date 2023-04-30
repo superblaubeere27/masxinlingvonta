@@ -12,9 +12,12 @@ public class StandardPostProcessor extends AbstractPostprocessor {
     public void postProcess(MLVCompiler compiler) {
         for (CompilerClass aClass : compiler.getIndex().getClasses()) {
             for (CompilerMethod method : aClass.getMethods()) {
-                if (!method.wasCompiled()) {
+                if (!method.wasOutsourced() || method.getParent().isLibrary()) {
                     continue;
                 }
+
+                if (method.getNode().name.startsWith("<"))
+                    throw new IllegalStateException("Tried to outsource <init>/<clinit> method");
 
                 var node = method.getNode();
 

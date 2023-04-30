@@ -27,6 +27,22 @@ public class InstructionExtractor extends AbstractPreprocessor implements Opcode
             var invokeDynamic = ((InvokeDynamicInsnNode) instruction);
 
             return Type.getArgumentTypes(invokeDynamic.desc);
+        } else if (instruction instanceof MethodInsnNode) {
+            var callInstruction = ((MethodInsnNode) instruction);
+
+            var argumentTypes = Type.getArgumentTypes(callInstruction.desc);
+
+            if (callInstruction.getOpcode() != INVOKESTATIC) {
+                var completeArgumentTypes = new Type[argumentTypes.length + 1];
+
+                completeArgumentTypes[0] = Type.getType("L" + callInstruction.owner + ";");
+
+                System.arraycopy(argumentTypes, 0, completeArgumentTypes, 1, argumentTypes.length);
+
+                argumentTypes = completeArgumentTypes;
+            }
+
+            return argumentTypes;
         }
 
         throw new IllegalArgumentException("Instruction not supported");
@@ -39,6 +55,10 @@ public class InstructionExtractor extends AbstractPreprocessor implements Opcode
             var invokeDynamic = ((InvokeDynamicInsnNode) instruction);
 
             return Type.getReturnType(invokeDynamic.desc);
+        } else if (instruction instanceof MethodInsnNode) {
+            var callInstruction = ((MethodInsnNode) instruction);
+
+            return Type.getReturnType(callInstruction.desc);
         }
 
         throw new IllegalArgumentException("Instruction not supported");
@@ -112,6 +132,10 @@ public class InstructionExtractor extends AbstractPreprocessor implements Opcode
      * Should this instruction be extracted to a method?
      */
     private boolean shouldExtract(AbstractInsnNode instruction) {
+        if (instruction instanceof MethodInsnNode) {
+            return ((MethodInsnNode) instruction).owner.equals("java/lang/invoke/MethodHandle");
+        }
+
         return instruction.getOpcode() == MULTIANEWARRAY || instruction.getOpcode() == INVOKEDYNAMIC;
     }
 }

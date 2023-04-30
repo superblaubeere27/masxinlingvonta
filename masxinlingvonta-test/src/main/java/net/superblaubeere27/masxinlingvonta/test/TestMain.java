@@ -8,4 +8,14 @@ public class TestMain {
         BranchTest.test();
     }
 
+    private static class A {
+        protected void doShit() {
+
+        }
+    }
+
+    private static abstract class B extends A {
+        protected abstract void doShit();
+    }
+
 }

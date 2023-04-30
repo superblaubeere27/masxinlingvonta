@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>masxinlingvonta</artifactId>
+        <groupId>net.superblaubeere27</groupId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>masxinlingvonta-opt</artifactId>
+
+    <properties>
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
+        <mlv.opt.mapleir.version>9bfa36cde3</mlv.opt.mapleir.version>
+    </properties>
+
+    <repositories>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
+
+    <dependencies>
+        <dependency>
+            <groupId>net.superblaubeere27</groupId>
+            <artifactId>masxinlingvonta-core</artifactId>
+            <version>1.0-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.github.superblaubeere27.maple-ir</groupId>
+            <artifactId>stdlib</artifactId>
+            <version>${mlv.opt.mapleir.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.superblaubeere27.maple-ir</groupId>
+            <artifactId>flowgraph</artifactId>
+            <version>${mlv.opt.mapleir.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.superblaubeere27.maple-ir</groupId>
+            <artifactId>modasm</artifactId>
+            <version>${mlv.opt.mapleir.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.superblaubeere27.maple-ir</groupId>
+            <artifactId>app-services</artifactId>
+            <version>${mlv.opt.mapleir.version}</version>
+        </dependency>
+    </dependencies>
+</project>

@@ -13,7 +13,7 @@ import java.util.List;
 
 public class CompilerPreprocessor {
     private static final List<AbstractPreprocessor> PREPROCESSORS = Arrays.asList(
-//            new LambdaPrecompiler(),
+            new LambdaPrecompiler(),
             new InstructionExtractor()
     );
 
@@ -45,6 +45,9 @@ public class CompilerPreprocessor {
 
         for (AbstractPreprocessor preprocessor : this.preprocessors) {
             for (CompilerClass cc : compiler.getIndex().getClasses()) {
+                if (cc.isLibrary())
+                    continue;
+
                 for (CompilerMethod method : cc.getMethods()) {
                     preprocessor.preprocess(method, this);
                 }
@@ -53,7 +56,7 @@ public class CompilerPreprocessor {
 
         this.methodsToAdd.forEach((compilerClass, extractedMethod) -> compilerClass.addMethod(compiler,
                 extractedMethod));
-        this.classesToAdd.forEach(x -> compiler.getIndex().addGeneratedClass(x));
+        compiler.getIndex().addGeneratedClasses(this.classesToAdd);
     }
 
     public void markForCompilation(CompilerMethod compilerMethod) {

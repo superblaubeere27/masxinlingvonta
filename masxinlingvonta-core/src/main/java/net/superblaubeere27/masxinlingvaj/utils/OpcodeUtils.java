@@ -4,35 +4,16 @@ import net.superblaubeere27.masxinlingvaj.compiler.code.instructions.BinaryOpera
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
+import org.objectweb.asm.tree.analysis.Frame;
+import org.objectweb.asm.tree.analysis.SourceValue;
 
 public class OpcodeUtils implements Opcodes {
     public static final Type OBJECT_TYPE = Type.getType("Ljava/lang/String;");
     private static final Type ARRAY_TYPE = Type.getType("[Ljava/lang/String;");
 
-    public static Type getNewArrayType(IntInsnNode newArray) {
-        switch (newArray.operand) {
-            case T_BOOLEAN:
-                return Type.BOOLEAN_TYPE;
-            case T_CHAR:
-                return Type.CHAR_TYPE;
-            case T_FLOAT:
-                return Type.FLOAT_TYPE;
-            case T_DOUBLE:
-                return Type.DOUBLE_TYPE;
-            case T_BYTE:
-                return Type.BYTE_TYPE;
-            case T_SHORT:
-                return Type.SHORT_TYPE;
-            case T_INT:
-                return Type.INT_TYPE;
-            case T_LONG:
-                return Type.LONG_TYPE;
-            default:
-                throw new IllegalStateException("Unexpected value: " + newArray.operand);
-        }
-    }
+    public static Type getTypeOfInsnNode(OpcodeAnalysisContext analysisContext, AbstractInsnNode abstractInsnNode) {
+        var opcode = abstractInsnNode.getOpcode();
 
-    public static Type getTypeOfInsnNode(int opcode) {
         if (opcode >= ICONST_M1 && opcode <= ICONST_5) {
             return Type.INT_TYPE;
         }
@@ -147,9 +128,68 @@ public class OpcodeUtils implements Opcodes {
             case MONITORENTER:
             case MONITOREXIT:
                 return Type.VOID_TYPE;
+            case DUP:
+            case DUP_X1:
+            case DUP_X2:
+            case DUP2:
+            case DUP2_X1:
+            case DUP2_X2:
+                Frame<SourceValue> frame = analysisContext.getFrameOfInstruction(abstractInsnNode);
+
+                return getReturnType(analysisContext, frame.getStack(frame.getStackSize() - 1).insns.stream().findFirst().get());
             default:
                 throw new IllegalStateException("Unexpected value: " + opcode);
         }
+    }
+
+    public static Type getNewArrayType(IntInsnNode newArray) {
+        switch (newArray.operand) {
+            case T_BOOLEAN:
+                return Type.BOOLEAN_TYPE;
+            case T_CHAR:
+                return Type.CHAR_TYPE;
+            case T_FLOAT:
+                return Type.FLOAT_TYPE;
+            case T_DOUBLE:
+                return Type.DOUBLE_TYPE;
+            case T_BYTE:
+                return Type.BYTE_TYPE;
+            case T_SHORT:
+                return Type.SHORT_TYPE;
+            case T_INT:
+                return Type.INT_TYPE;
+            case T_LONG:
+                return Type.LONG_TYPE;
+            default:
+                throw new IllegalStateException("Unexpected value: " + newArray.operand);
+        }
+    }
+
+    public static Type getReturnType(OpcodeAnalysisContext analysisContext, AbstractInsnNode insn) {
+        if (insn instanceof FieldInsnNode) {
+            return Type.getType(((FieldInsnNode) insn).desc);
+        } else if (insn instanceof MethodInsnNode) {
+            return Type.getReturnType(((MethodInsnNode) insn).desc);
+        } else if (insn instanceof IntInsnNode) {
+            return insn.getOpcode() == NEWARRAY ? Type.getType("[" + getNewArrayType((IntInsnNode) insn).getDescriptor()) : Type.INT_TYPE;
+        } else if (insn instanceof MultiANewArrayInsnNode) {
+            return Type.getType(((MultiANewArrayInsnNode) insn).desc);
+        } else if (insn instanceof LdcInsnNode) {
+            return getLdcType((LdcInsnNode) insn);
+        } else if (insn instanceof TypeInsnNode) {
+            if (insn.getOpcode() == NEW || insn.getOpcode() == CHECKCAST) {
+                return Type.getType("L" + ((TypeInsnNode) insn).desc + ";");
+            } else if (insn.getOpcode() == ANEWARRAY) {
+                return Type.getType("[L" + ((TypeInsnNode) insn).desc + ";");
+            } else if (insn.getOpcode() == INSTANCEOF) {
+                return Type.BOOLEAN_TYPE;
+            }
+        } else if (insn instanceof InvokeDynamicInsnNode) {
+            return Type.getReturnType(((InvokeDynamicInsnNode) insn).desc);
+        } else if (insn instanceof VarInsnNode || insn instanceof InsnNode) {
+            return getTypeOfInsnNode(analysisContext, insn);
+        }
+        throw new IllegalStateException("Unreachable");
     }
 
     public static BinaryOperationInstruction.BinaryOperationType getBinaryOperation(int opcode) {
@@ -272,31 +312,18 @@ public class OpcodeUtils implements Opcodes {
         }
     }
 
-    public static Type getReturnType(AbstractInsnNode insn) {
-        if (insn instanceof FieldInsnNode) {
-            return Type.getType(((FieldInsnNode) insn).desc);
-        } else if (insn instanceof MethodInsnNode) {
-            return Type.getReturnType(((MethodInsnNode) insn).desc);
-        } else if (insn instanceof IntInsnNode) {
-            return Type.INT_TYPE;
-        } else if (insn instanceof MultiANewArrayInsnNode) {
-            return Type.getType(((MultiANewArrayInsnNode) insn).desc);
-        } else if (insn instanceof LdcInsnNode) {
-            return getLdcType((LdcInsnNode) insn);
-        } else if (insn instanceof TypeInsnNode) {
-            if (insn.getOpcode() == NEW || insn.getOpcode() == CHECKCAST) {
-                return Type.getType("L" + ((TypeInsnNode) insn).desc + ";");
-            } else if (insn.getOpcode() == ANEWARRAY) {
-                return Type.getType("[L" + ((TypeInsnNode) insn).desc + ";");
-            } else if (insn.getOpcode() == INSTANCEOF) {
-                return Type.BOOLEAN_TYPE;
-            }
-        } else if (insn instanceof InvokeDynamicInsnNode) {
-            return Type.getReturnType(((InvokeDynamicInsnNode) insn).desc);
-        } else if (insn instanceof VarInsnNode || insn instanceof InsnNode) {
-            return getTypeOfInsnNode(insn.getOpcode());
+    public static class OpcodeAnalysisContext {
+        private final Frame<SourceValue>[] sourceValueFrames;
+        private final InsnList insnList;
+
+        public OpcodeAnalysisContext(Frame<SourceValue>[] sourceValueFrames, InsnList insnList) {
+            this.sourceValueFrames = sourceValueFrames;
+            this.insnList = insnList;
         }
-        throw new IllegalStateException("Unreachable");
+
+        public Frame<SourceValue> getFrameOfInstruction(AbstractInsnNode insnNode) {
+            return this.sourceValueFrames[insnList.indexOf(insnNode)];
+        }
     }
 
     private static Type getLdcType(LdcInsnNode insn) {

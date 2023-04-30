@@ -6,6 +6,13 @@ import org.objectweb.asm.Type;
 import static org.bytedeco.llvm.global.LLVM.LLVMGetModuleContext;
 
 public class JNI {
+    public static int JNI_OK = 0;
+    public static int JNI_ERR = -1;
+    /**
+     * JNI version of this interface, currently JNI_VERSION_1_2
+     */
+    public static int JNI_VERSION = 0x00010002;
+
     private final LLVMModuleRef module;
     private final JNIEnv jniEnv;
 

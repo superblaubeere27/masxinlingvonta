@@ -49,7 +49,7 @@ public class MethodStack {
         for (AbstractInsnNode instruction : this.method.getNode().instructions) {
             if (instruction instanceof VarInsnNode) {
                 this.ensureLocalAllocated(new StackSlot(compiler.getJni().toNativeType(OpcodeUtils.getReturnType(
-                        instruction)), ((VarInsnNode) instruction).var), builder);
+                        null, instruction)), ((VarInsnNode) instruction).var), builder);
             }
         }
     }

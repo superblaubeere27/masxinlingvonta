@@ -29,7 +29,7 @@ import java.util.Objects;
  */
 public class CodeConverter implements Opcodes {
 
-    public static ArrayList<Block> convert(MLVCompiler compiler, CompilerMethod compilerMethod, TranslatedMethod translatedMethod) throws AnalyzerException {
+    /*public static ArrayList<Block> convert(MLVCompiler compiler, CompilerMethod compilerMethod, TranslatedMethod translatedMethod) throws AnalyzerException {
         var frames = new Analyzer<>(new SourceInterpreter()).analyze(compilerMethod.getParent().getName(),
                                                                      compilerMethod.getNode());
 
@@ -249,7 +249,7 @@ public class CodeConverter implements Opcodes {
             case DLOAD:
             case ALOAD:
                 return new LocalInstruction(new StackSlot(compiler.getJni().toNativeType(OpcodeUtils.getReturnType(
-                        instruction)), stackFrame.getStackSize()), ((VarInsnNode) instruction).var, false);
+                        null, instruction)), stackFrame.getStackSize()), ((VarInsnNode) instruction).var, false);
             case IALOAD: // visitInsn
             case LALOAD:
             case FALOAD:
@@ -258,7 +258,7 @@ public class CodeConverter implements Opcodes {
             case BALOAD:
             case CALOAD:
             case SALOAD: {
-                var type = OpcodeUtils.getReturnType(instruction);
+                var type = OpcodeUtils.getReturnType(null, instruction);
 
                 return new ArrayModificationInstruction(
                         new StackSlot(JNIType.OBJECT, stackFrame.getStackSize() - 2),
@@ -273,7 +273,7 @@ public class CodeConverter implements Opcodes {
             case FSTORE:
             case DSTORE:
             case ASTORE: {
-                var type = OpcodeUtils.getReturnType(instruction);
+                var type = OpcodeUtils.getReturnType(null, instruction);
 
                 return new LocalInstruction(
                         new StackSlot(compiler.getJni().toNativeType(type), stackFrame.getStackSize() - 1),
@@ -288,12 +288,10 @@ public class CodeConverter implements Opcodes {
             case BASTORE:
             case CASTORE:
             case SASTORE: {
-                var type = OpcodeUtils.getReturnType(instruction);
-
                 return new ArrayModificationInstruction(
                         new StackSlot(JNIType.OBJECT, stackFrame.getStackSize() - 3),
                         new StackSlot(JNIType.INT, stackFrame.getStackSize() - 2),
-                        new StackSlot(compiler.getJni().toNativeType(OpcodeUtils.getReturnType(instruction)).getStackStorageType(),
+                        new StackSlot(compiler.getJni().toNativeType(OpcodeUtils.getReturnType(null, instruction)).getStackStorageType(),
                                       stackFrame.getStackSize() - 1),
                         true
                 );
@@ -330,7 +328,7 @@ public class CodeConverter implements Opcodes {
             case LOR:
             case IXOR:
             case LXOR: {
-                var type = OpcodeUtils.getReturnType(instruction);
+                var type = OpcodeUtils.getReturnType(null, instruction);
                 var jniType = compiler.getJni().toNativeType(type);
 
                 return new BinaryOperationInstruction(
@@ -344,7 +342,7 @@ public class CodeConverter implements Opcodes {
             case LNEG:
             case FNEG:
             case DNEG: {
-                var type = OpcodeUtils.getReturnType(instruction);
+                var type = OpcodeUtils.getReturnType(null, instruction);
                 var jniType = compiler.getJni().toNativeType(type);
 
                 return new UnaryInstruction(
@@ -466,10 +464,10 @@ public class CodeConverter implements Opcodes {
             case FRETURN:
             case DRETURN:
             case ARETURN: {
-                var type = OpcodeUtils.getReturnType(instruction);
+                var type = OpcodeUtils.getReturnType(null, instruction);
 
                 return new ValueReturnInstruction(new StackSlot(compiler.getJni().toNativeType(OpcodeUtils.getReturnType(
-                        instruction)), stackFrame.getStackSize() - 1));
+                        null, instruction)), stackFrame.getStackSize() - 1));
             }
             case RETURN:
                 return new ReturnInstruction();
@@ -605,7 +603,7 @@ public class CodeConverter implements Opcodes {
         Type currentType = null;
 
         for (AbstractInsnNode insn : stack.insns) {
-            Type t = OpcodeUtils.getReturnType(insn);
+            Type t = OpcodeUtils.getReturnType(null, insn);
 
             if (currentType == null || t.getSort() == currentType.getSort()) {
                 currentType = t;
@@ -622,6 +620,6 @@ public class CodeConverter implements Opcodes {
         else
             type = compiler.getJni().toNativeType(currentType).getStackStorageType();
         return type;
-    }
+    }*/
 
 }

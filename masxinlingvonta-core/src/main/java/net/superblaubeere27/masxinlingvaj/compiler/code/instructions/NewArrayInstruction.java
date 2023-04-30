@@ -38,7 +38,7 @@ public class NewArrayInstruction extends Instruction {
 
         LLVMValueRef array;
 
-        if (this.type.getSort() == Type.OBJECT) {
+        if (this.type.getSort() == Type.OBJECT || this.type.getSort() == ARRAY) {
             array = compiler.getJni().getJniEnv().callEnvironmentMethod(
                     translatedMethod, translatedMethod.getEnvPtr(),
                     JNIEnv.JNIEnvMethod.NewObjectArray,

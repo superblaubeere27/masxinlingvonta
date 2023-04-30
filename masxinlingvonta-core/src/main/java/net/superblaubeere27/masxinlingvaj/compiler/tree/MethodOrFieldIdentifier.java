@@ -1,5 +1,6 @@
 package net.superblaubeere27.masxinlingvaj.compiler.tree;
 
+import org.objectweb.asm.Handle;
 import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 
@@ -27,6 +28,10 @@ public class MethodOrFieldIdentifier {
         this.owner = owner;
         this.name = name;
         this.desc = desc;
+    }
+
+    public MethodOrFieldIdentifier(Handle handle) {
+        this(handle.getOwner(), handle.getName(), handle.getDesc());
     }
 
     public String getOwner() {
@@ -60,5 +65,10 @@ public class MethodOrFieldIdentifier {
         this.hashCode = Objects.hash(owner, name, desc, hashCode);
 
         return this.hashCode;
+    }
+
+    @Override
+    public String toString() {
+        return owner + "." + this.name + this.desc;
     }
 }

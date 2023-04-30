@@ -81,6 +81,11 @@ public class Block {
         LLVM.LLVMPositionBuilderAtEnd(builder, okBlock);
     }
 
+    /**
+     * Gets or builds the exception handler block
+     *
+     * @return a basic block reference to the exception handler block
+     */
     public LLVMBasicBlockRef getExceptionBlock(MLVCompiler compiler, TranslatedMethod translatedMethod) {
         if (this.exceptionHandlerBlock != null) {
             return this.exceptionHandlerBlock;

@@ -1,0 +1,20 @@
+Set Static Field: 2.270ms
+Set Static Object Field: 2.832ms (+ 0.562ms)
+
+Set Field: 4.052ms
+Set Object Field: 4.589ms
+
+Get Static Field: 2.245ms
+Get Static Object Field: 2.734ms (+ 0.489ms)
+
+Get Field: 2.515ms (+ 0.270ms)
+Get Object Field: 4.947ms
+
+Static Invoke: 10.931ms
+Static Invoke (1 Object Parameter): 11.249ms (+ 0.318ms)
+Static Invoke (2 Object Parameter): 11.249ms (+ 0.452ms)
+
+Non Virtual Invoke: 14.834ms (+ 3.903ms)
+
+Array Store: 6.219ms
+Array Store (Object): 8.034ms

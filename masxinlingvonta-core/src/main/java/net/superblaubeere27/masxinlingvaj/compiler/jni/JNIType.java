@@ -4,22 +4,26 @@ import org.bytedeco.llvm.LLVM.LLVMTypeRef;
 import org.bytedeco.llvm.global.LLVM;
 
 public enum JNIType {
-    VOID(LLVM.LLVMVoidType()),
-    BOOLEAN(LLVM.LLVMInt1Type()),
-    CHAR(LLVM.LLVMInt16Type()),
-    BYTE(LLVM.LLVMInt8Type()),
-    SHORT(LLVM.LLVMInt16Type()),
-    INT(LLVM.LLVMInt32Type()),
-    LONG(LLVM.LLVMInt64Type()),
-    FLOAT(LLVM.LLVMFloatType()),
-    DOUBLE(LLVM.LLVMDoubleType()),
-    OBJECT(LLVM.LLVMPointerType(LLVM.LLVMInt8Type(), 0)),
+    VOID("void", LLVM.LLVMVoidType(), -1),
+    BOOLEAN("boolean", LLVM.LLVMInt1Type(), 1),
+    CHAR("char", LLVM.LLVMInt16Type(), 2),
+    BYTE("byte", LLVM.LLVMInt8Type(), 1),
+    SHORT("short", LLVM.LLVMInt16Type(), 2),
+    INT("int", LLVM.LLVMInt32Type(), 4),
+    LONG("long", LLVM.LLVMInt64Type(), 8),
+    FLOAT("float", LLVM.LLVMFloatType(), 4),
+    DOUBLE("double", LLVM.LLVMDoubleType(), 8),
+    OBJECT("Object", LLVM.LLVMPointerType(LLVM.LLVMInt8Type(), 0), 8),
     ;
 
+    private final String displayName;
     private final LLVMTypeRef type;
+    private final int sizeInBytes;
 
-    JNIType(LLVMTypeRef llvmVoidType) {
+    JNIType(String displayName, LLVMTypeRef llvmVoidType, int sizeInBytes) {
+        this.displayName = displayName;
         this.type = llvmVoidType;
+        this.sizeInBytes = sizeInBytes;
     }
 
     public LLVMTypeRef getLLVMType() {
@@ -66,5 +70,17 @@ public enum JNIType {
             default:
                 throw new IllegalStateException("Unexpected value: " + this);
         }
+    }
+
+    public int getSizeInBytes() {
+        return sizeInBytes;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public boolean isSigned() {
+        return this != CHAR;
     }
 }

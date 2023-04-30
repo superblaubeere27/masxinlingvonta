@@ -1,0 +1,19 @@
+{
+  "additionalMethodsToCompile": [
+    {
+      "owner": "net/ccbluex/liquidbounce/features/module/modules/combat/ModuleAutoArmor",
+      "name": "move",
+      "desc": "(IZ)Z"
+    },
+    {
+      "owner": "net/ccbluex/liquidbounce/features/module/modules/world/ModuleScaffold",
+      "name": "updateTarget",
+      "desc": "()V"
+    },
+    {
+      "owner": "net/ccbluex/liquidbounce/utils/aiming/GaussianPattern",
+      "name": "update",
+      "desc": "()V"
+    }
+  ]
+}

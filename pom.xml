@@ -26,6 +26,7 @@
         <module>masxinlingvonta-core</module>
         <module>masxinlingvonta-test</module>
         <module>masxinlingvonta-cli</module>
+        <module>masxinlingvonta-opt</module>
     </modules>
 
     <properties>
@@ -58,6 +59,11 @@
             <version>${asm.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm-util</artifactId>
+            <version>${asm.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.bytedeco</groupId>
             <artifactId>llvm-platform</artifactId>
             <version>11.1.0-1.5.5</version>
@@ -66,6 +72,19 @@
             <groupId>com.github.pcj</groupId>
             <artifactId>google-options</artifactId>
             <version>1.0.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>22.0</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>RELEASE</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

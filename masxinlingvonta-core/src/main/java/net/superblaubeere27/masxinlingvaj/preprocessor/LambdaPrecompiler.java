@@ -2,22 +2,34 @@ package net.superblaubeere27.masxinlingvaj.preprocessor;
 
 import net.superblaubeere27.masxinlingvaj.compiler.MLVCompiler;
 import net.superblaubeere27.masxinlingvaj.compiler.tree.CompilerMethod;
+import net.superblaubeere27.masxinlingvaj.compiler.tree.MethodOrFieldIdentifier;
 import net.superblaubeere27.masxinlingvaj.preprocessor.codegen.LambdaCodegen;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.InnerClassNode;
-import org.objectweb.asm.tree.InvokeDynamicInsnNode;
-import org.objectweb.asm.tree.MethodInsnNode;
+import org.objectweb.asm.tree.*;
 
+import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class LambdaPrecompiler extends AbstractPreprocessor {
     private final AtomicInteger lambdaCounter = new AtomicInteger(0);
+    private MLVCompiler compiler;
+
+    private static void linkGeneratedClassToParentClass(CompilerMethod method, InnerClassNode innerClass) {
+        ClassNode parentClassNode = method.getParent().getClassNode();
+
+        parentClassNode.innerClasses.add(innerClass);
+
+        if (parentClassNode.nestMembers == null)
+            parentClassNode.nestMembers = new ArrayList<>();
+
+        parentClassNode.nestMembers.add(innerClass.name);
+    }
 
     @Override
     public void init(MLVCompiler compiler, CompilerPreprocessor preprocessor) throws Exception {
+        this.compiler = compiler;
     }
 
     @Override
@@ -35,7 +47,11 @@ public class LambdaPrecompiler extends AbstractPreprocessor {
             var lambdaClassName = "Lambda" + this.lambdaCounter.getAndIncrement();
             var fullLambdaClassName = method.getParent().getName() + "$" + lambdaClassName;
 
-            LambdaCodegen codegen = new LambdaCodegen((Handle) invokeDynamic.bsmArgs[1],
+            var targetMethodHandle = (Handle) invokeDynamic.bsmArgs[1];
+
+            makeLambdaFunctionAccessible(targetMethodHandle);
+
+            LambdaCodegen codegen = new LambdaCodegen(targetMethodHandle,
                     invokeDynamic.name,
                     ((Type) invokeDynamic.bsmArgs[0]).getDescriptor(),
                     invokeDynamic.desc,
@@ -45,17 +61,16 @@ public class LambdaPrecompiler extends AbstractPreprocessor {
 
             var innerClass = new InnerClassNode(fullLambdaClassName,
                     method.getParent().getName(),
-                    lambdaClassName,
+                    null,
                     Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC);
 
 
             var callSite = codegen.spinInnerClass();
 
-            method.getParent().getClassNode().innerClasses.add(innerClass);
-            method.getParent().getClassNode().nestMembers.add(fullLambdaClassName);
+            linkGeneratedClassToParentClass(method, innerClass);
 
-            callSite.getClassNode().innerClasses.add(innerClass);
             callSite.getClassNode().nestHostClass = method.getParent().getName();
+            callSite.getClassNode().outerClass = method.getParent().getName();
 
             var handle = callSite.getHandle();
 
@@ -78,6 +93,10 @@ public class LambdaPrecompiler extends AbstractPreprocessor {
 
             method.getParent().setModifiedFlag();
         }
+    }
+
+    private void makeLambdaFunctionAccessible(Handle targetMethodHandle) {
+        this.compiler.getIndex().getMethod(new MethodOrFieldIdentifier(targetMethodHandle)).getNode().access &= ~(Opcodes.ACC_SYNTHETIC | Opcodes.ACC_PRIVATE);
     }
 
 }

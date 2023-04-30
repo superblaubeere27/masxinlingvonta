@@ -1,6 +1,7 @@
 package net.superblaubeere27.masxinlingvaj.compiler.tree;
 
 import net.superblaubeere27.masxinlingvaj.compiler.MLVCompiler;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
@@ -16,6 +17,8 @@ public class CompilerClass {
     private final List<CompilerField> fields;
     private final boolean isLibrary;
     private boolean modifiedFlag;
+
+    private ClassRelations relations;
 
     public CompilerClass(ClassNode classNode, boolean isLibrary) {
         this(classNode, isLibrary, false);
@@ -72,10 +75,29 @@ public class CompilerClass {
     }
 
     public void setModifiedFlag() {
+        if (this.isLibrary)
+            throw new IllegalStateException("Library class \"" + this.getName() + "\" cannot be modified");
+
         this.modifiedFlag = true;
     }
 
     public boolean getModifiedFlag() {
         return this.modifiedFlag;
+    }
+
+    public ClassRelations getRelations() {
+        return relations;
+    }
+
+    public void setRelations(ClassRelations relations) {
+        this.relations = relations;
+    }
+
+    public boolean isLibrary() {
+        return isLibrary;
+    }
+
+    public boolean isInterface() {
+        return (this.classNode.access & Opcodes.ACC_INTERFACE) != 0;
     }
 }

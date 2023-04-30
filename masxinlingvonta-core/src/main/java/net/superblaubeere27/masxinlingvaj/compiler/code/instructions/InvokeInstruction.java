@@ -113,7 +113,7 @@ public class InvokeInstruction extends Instruction {
         block.buildExceptionCheck(compiler, translatedMethod);
     }
 
-    private JNIEnv.JNIEnvMethod getJNIMethod(JNIType jniType, boolean isStatic, boolean isNonVirtual) {
+    public static JNIEnv.JNIEnvMethod getJNIMethod(JNIType jniType, boolean isStatic, boolean isNonVirtual) {
         if (isStatic) {
             switch (jniType) {
                 case VOID:

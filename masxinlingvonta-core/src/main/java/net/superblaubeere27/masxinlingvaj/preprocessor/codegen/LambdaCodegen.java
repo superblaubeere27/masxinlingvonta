@@ -76,7 +76,7 @@ public final class LambdaCodegen implements Opcodes {
     private final String implMethodName;             // Name of implementation method "impl"
     private final String implMethodDesc;             // Type descriptor for implementation methods "(I)Ljava/lang/String;"
     private final String constructorType;        // Generated class constructor type "(CC)void"
-    private final ClassNode cw;                    // ASM class writer
+    private final ClassWriter cw;                    // ASM class writer
     private final String[] argNames;                 // Generated names for the constructor arguments
     private final String[] argDescs;                 // Type descriptors for the constructor arguments
     private final String lambdaClassName;            // Generated name for the generated class "X$$Lambda$1"
@@ -90,27 +90,27 @@ public final class LambdaCodegen implements Opcodes {
     private final String instantiatedMethodType;
 
     public LambdaCodegen(Handle implInfo, String invokedName, String samMethodDesc, String invokedType, String instantiatedMethodType, String lambdaClassName, boolean isInterface) {
-        this.implMethodType = implInfo.getDesc();
+        this.implMethodType = getEffectiveType(implInfo);
         this.invokedType = invokedType;
         this.isInterface = isInterface;
 
         switch (implInfo.getTag()) {
             case H_INVOKEVIRTUAL:
             case H_INVOKEINTERFACE:
-                this.implClass = Type.getArgumentTypes(invokedType)[0].getInternalName();
+                this.implClass = Type.getArgumentTypes(implMethodType)[0].getInternalName();
                 // reference kind reported by implInfo may not match implMethodType's first param
                 // Example: implMethodType is (Cloneable)String, implInfo is for Object.toString
                 this.implKind = isInterface ? H_INVOKEINTERFACE : H_INVOKEVIRTUAL;
                 boolean implIsInstanceMethod = true;
                 break;
-            case REF_invokeSpecial:
+            case H_INVOKESPECIAL:
                 // JDK-8172817: should use referenced class here, but we don't know what it was
                 this.implClass = implInfo.getOwner();
                 this.implKind = REF_invokeSpecial;
                 implIsInstanceMethod = true;
                 break;
-            case REF_invokeStatic:
-            case REF_newInvokeSpecial:
+            case H_INVOKESTATIC:
+            case H_NEWINVOKESPECIAL:
                 // JDK-8172817: should use referenced class here for invokestatic, but we don't know what it was
                 this.implClass = implInfo.getOwner();
                 this.implKind = implInfo.getTag();
@@ -131,7 +131,7 @@ public final class LambdaCodegen implements Opcodes {
         implMethodDesc = implInfo.getDesc();
         constructorType = methodType(invokedMethodArgumentTypes, Type.VOID_TYPE);
         this.lambdaClassName = lambdaClassName;
-        cw = new ClassNode();
+        cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         int parameterCount = invokedMethodArgumentTypes.length;
         if (parameterCount > 0) {
             argNames = new String[parameterCount];
@@ -142,6 +142,20 @@ public final class LambdaCodegen implements Opcodes {
             }
         } else {
             argNames = argDescs = EMPTY_STRING_ARRAY;
+        }
+    }
+
+    public static String getEffectiveType(Handle handle) {
+        boolean isInstanceMethod = switch (handle.getTag()) {
+            case H_INVOKEVIRTUAL, H_INVOKEINTERFACE, H_INVOKESPECIAL -> true;
+            case H_INVOKESTATIC, H_NEWINVOKESPECIAL -> false;
+            default -> throw new IllegalArgumentException("Illegal handle type");
+        };
+
+        if (isInstanceMethod) {
+            return "(L" + handle.getOwner() + ";" + handle.getDesc().substring(1);
+        } else {
+            return handle.getDesc();
         }
     }
 
@@ -199,18 +213,25 @@ public final class LambdaCodegen implements Opcodes {
 
         cw.visitEnd();
 
+        ClassReader cr = new ClassReader(cw.toByteArray());
+
+        // Why so complicated? Because COMPUTE_MAXS
+        ClassNode cn = new ClassNode();
+
+        cr.accept(cn, 0);
+
         return new PreGeneratedCallSite(new Handle(H_INVOKESTATIC,
                 this.lambdaClassName,
                 NAME_FACTORY,
                 this.invokedType,
-                false), cw);
+                false), cn);
     }
 
     /**
      * Generate the factory method for the class
      */
     private void generateFactory() {
-        MethodVisitor m = cw.visitMethod(ACC_PRIVATE | ACC_STATIC, NAME_FACTORY, invokedType, null, null);
+        MethodVisitor m = cw.visitMethod(ACC_STATIC, NAME_FACTORY, invokedType, null, null);
         m.visitCode();
         m.visitTypeInsn(NEW, lambdaClassName);
         m.visitInsn(Opcodes.DUP);

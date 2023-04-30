@@ -1,7 +1,6 @@
 package net.superblaubeere27.masxinlingvaj;
 
 import net.superblaubeere27.masxinlingvaj.compiler.MLVCompiler;
-import net.superblaubeere27.masxinlingvaj.compiler.tree.CompilerMethod;
 import net.superblaubeere27.masxinlingvaj.io.InputLoader;
 import net.superblaubeere27.masxinlingvaj.io.OutputWriter;
 import net.superblaubeere27.masxinlingvaj.postprocessor.CompilerPostprocessor;
@@ -16,7 +15,9 @@ import org.bytedeco.llvm.LLVM.LLVMPassManagerRef;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.URL;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.Executors;
 
 import static org.bytedeco.llvm.global.LLVM.*;
@@ -26,6 +27,7 @@ public class MLV {
 
     private final CompilerPreprocessor preprocessor;
     private InputLoader.ReadInput input;
+    private InputLoader.ReadInput libraries;
     private MLVCompiler compiler;
 
     public MLV(CompilerPreprocessor preprocessor) {
@@ -33,17 +35,19 @@ public class MLV {
     }
 
     public void loadInput(File jar) throws IOException {
-        this.input = InputLoader.loadFiles(Collections.singletonList(jar.toURI().toURL()), EXECUTOR_SERVICE_FACTORY);
+        this.input = InputLoader.loadFiles(Collections.singletonList(jar.toURI().toURL()), EXECUTOR_SERVICE_FACTORY, false);
+    }
+
+    public void loadLibraries(List<URL> jars) throws IOException {
+        this.libraries = InputLoader.loadFiles(jars, EXECUTOR_SERVICE_FACTORY, true);
     }
 
     public void preprocessAndCompile() throws Exception {
-        this.compiler = new MLVCompiler(this.input.getClassNodes());
+        this.compiler = new MLVCompiler(this.input.getClassNodes(), this.libraries.getClassNodes());
 
         preprocessor.preprocess(compiler);
 
-        for (CompilerMethod compilerMethod : preprocessor.getMethodsToCompile()) {
-            compiler.compileMethod(compilerMethod);
-        }
+        compiler.compile(preprocessor);
 
         new CompilerPostprocessor().postprocess(this.compiler);
     }

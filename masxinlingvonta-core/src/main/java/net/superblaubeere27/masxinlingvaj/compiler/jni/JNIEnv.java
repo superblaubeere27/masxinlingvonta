@@ -2,10 +2,7 @@ package net.superblaubeere27.masxinlingvaj.compiler.jni;
 
 import net.superblaubeere27.masxinlingvaj.compiler.TranslatedMethod;
 import org.bytedeco.javacpp.PointerPointer;
-import org.bytedeco.llvm.LLVM.LLVMAttributeRef;
-import org.bytedeco.llvm.LLVM.LLVMContextRef;
-import org.bytedeco.llvm.LLVM.LLVMTypeRef;
-import org.bytedeco.llvm.LLVM.LLVMValueRef;
+import org.bytedeco.llvm.LLVM.*;
 import org.bytedeco.llvm.global.LLVM;
 
 import java.util.Arrays;
@@ -45,11 +42,13 @@ public class JNIEnv {
     }
 
     public LLVMValueRef callEnvironmentMethod(TranslatedMethod translatedMethod, LLVMValueRef envPtr, JNIEnvMethod method, LLVMValueRef... params) {
-        var builder = translatedMethod.getLlvmBuilder();
+        return callEnvironmentMethod(envPtr, method, translatedMethod.getLlvmBuilder(), translatedMethod.getJniFunctionTable(), params);
+    }
 
+    public LLVMValueRef callEnvironmentMethod(LLVMValueRef envPtr, JNIEnvMethod method, LLVMBuilderRef builder, LLVMValueRef functionTable, LLVMValueRef... params) {
         var methodName = method.toString().toLowerCase(Locale.ROOT);
         var function_ptr = LLVMBuildLoad(builder,
-                LLVMBuildStructGEP(builder, translatedMethod.getJniFunctionTable(), method.ordinal(), ""),
+                LLVMBuildStructGEP(builder, functionTable, method.ordinal(), ""),
                 methodName + "*");
 
         var param_array = new LLVMValueRef[params.length + 1];
@@ -58,11 +57,13 @@ public class JNIEnv {
 
         System.arraycopy(params, 0, param_array, 1, params.length);
 
-        String name = "call_" + methodName;
+        String name;
 
         // Because void functions cannot have names...
         if (LLVMGetTypeKind(LLVM.LLVMGetReturnType(LLVMGetElementType(method.llvmType))) == LLVMVoidTypeKind) {
             name = "";
+        } else {
+            name = "call_" + methodName;
         }
 
         var call = LLVMBuildCall(builder, function_ptr, new PointerPointer<>(param_array), param_array.length, name);
@@ -600,47 +601,47 @@ public class JNIEnv {
                                 LLVMInt8Type(),
                                 0)},
                         false)),
-        GetObjectField(SideEffectType.READ_ONLY,
+        GetObjectField(SideEffectType.NORMAL,
                 functionType(JNIType.OBJECT.getLLVMType(),
                         new LLVMTypeRef[]{LLVMPointerType(LLVMInt8Type(),
                                 0), JNIType.OBJECT.getLLVMType(), JNIType.OBJECT.getLLVMType()},
                         false)),
-        GetBooleanField(SideEffectType.READ_ONLY,
+        GetBooleanField(SideEffectType.NORMAL,
                 functionType(JNIType.BOOLEAN.getLLVMType(),
                         new LLVMTypeRef[]{LLVMPointerType(LLVMInt8Type(),
                                 0), JNIType.OBJECT.getLLVMType(), JNIType.OBJECT.getLLVMType()},
                         false)),
-        GetByteField(SideEffectType.READ_ONLY,
+        GetByteField(SideEffectType.NORMAL,
                 functionType(JNIType.BYTE.getLLVMType(),
                         new LLVMTypeRef[]{LLVMPointerType(LLVMInt8Type(),
                                 0), JNIType.OBJECT.getLLVMType(), JNIType.OBJECT.getLLVMType()},
                         false)),
-        GetCharField(SideEffectType.READ_ONLY,
+        GetCharField(SideEffectType.NORMAL,
                 functionType(JNIType.CHAR.getLLVMType(),
                         new LLVMTypeRef[]{LLVMPointerType(LLVMInt8Type(),
                                 0), JNIType.OBJECT.getLLVMType(), JNIType.OBJECT.getLLVMType()},
                         false)),
-        GetShortField(SideEffectType.READ_ONLY,
+        GetShortField(SideEffectType.NORMAL,
                 functionType(JNIType.SHORT.getLLVMType(),
                         new LLVMTypeRef[]{LLVMPointerType(LLVMInt8Type(),
                                 0), JNIType.OBJECT.getLLVMType(), JNIType.OBJECT.getLLVMType()},
                         false)),
-        GetIntField(SideEffectType.READ_ONLY,
+        GetIntField(SideEffectType.NORMAL,
                 functionType(JNIType.INT.getLLVMType(),
                         new LLVMTypeRef[]{LLVMPointerType(LLVMInt8Type(),
                                 0), JNIType.OBJECT.getLLVMType(), JNIType.OBJECT.getLLVMType()},
                         false)),
-        GetLongField(SideEffectType.READ_ONLY,
+        GetLongField(SideEffectType.NORMAL,
                 functionType(JNIType.LONG.getLLVMType(),
                         new LLVMTypeRef[]{LLVMPointerType(LLVMInt8Type(),
                                 0), JNIType.OBJECT.getLLVMType(), JNIType.OBJECT.getLLVMType()},
                         false)),
-        GetFloatField(SideEffectType.READ_ONLY,
+        GetFloatField(SideEffectType.NORMAL,
                 functionType(JNIType.FLOAT.getLLVMType(),
                         new LLVMTypeRef[]{LLVMPointerType(LLVMInt8Type(),
                                 0), JNIType.OBJECT.getLLVMType(), JNIType.OBJECT.getLLVMType()},
                         false)),
-        GetDoubleField(SideEffectType.READ_ONLY,
+        GetDoubleField(SideEffectType.NORMAL,
                 functionType(JNIType.DOUBLE.getLLVMType(),
                         new LLVMTypeRef[]{LLVMPointerType(LLVMInt8Type(),
                                 0), JNIType.OBJECT.getLLVMType(), JNIType.OBJECT.getLLVMType()},
@@ -1030,12 +1031,12 @@ public class JNIEnv {
                         new LLVMTypeRef[]{LLVMPointerType(LLVMInt8Type(),
                                 0), JNIType.INT.getLLVMType(), JNIType.OBJECT.getLLVMType(), JNIType.OBJECT.getLLVMType()},
                         false)),
-        GetObjectArrayElement(SideEffectType.READ_ONLY,
+        GetObjectArrayElement(SideEffectType.NORMAL,
                 functionType(JNIType.OBJECT.getLLVMType(),
                         new LLVMTypeRef[]{LLVMPointerType(LLVMInt8Type(),
                                 0), JNIType.OBJECT.getLLVMType(), JNIType.INT.getLLVMType()},
                         false)),
-        SetObjectArrayElement(SideEffectType.READ_ONLY,
+        SetObjectArrayElement(SideEffectType.NORMAL,
                 functionType(LLVMVoidType(),
                         new LLVMTypeRef[]{LLVMPointerType(LLVMInt8Type(),
                                 0), JNIType.OBJECT.getLLVMType(), JNIType.INT.getLLVMType(), JNIType.OBJECT.getLLVMType()},

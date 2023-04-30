@@ -32,7 +32,7 @@ public class InputLoader {
         try (ZipInputStream zipInputStream = new ZipInputStream(input.openStream())) {
             ZipEntry zipEntry;
 
-            // While there are zip entries..
+            // While there are zip entries...
             while ((zipEntry = zipInputStream.getNextEntry()) != null) {
                 // Read the entry data and send it to the consumer
                 dataConsumer.accept(zipEntry.getName(), zipInputStream.readAllBytes());
@@ -45,10 +45,11 @@ public class InputLoader {
      *
      * @param inputs          the locations of the input files
      * @param executorFactory the executor factory that creates executors for multithreaded reading
+     * @param library
      * @return all read classes
      * @throws IOException when an IO exception occurs
      */
-    public static ReadInput loadFiles(List<URL> inputs, ExecutorServiceFactory executorFactory) throws IOException {
+    public static ReadInput loadFiles(List<URL> inputs, ExecutorServiceFactory executorFactory, boolean library) throws IOException {
         var executor = executorFactory.createExecutor();
 
         HashMap<String, byte[]> rawData = new HashMap<>();
@@ -57,7 +58,9 @@ public class InputLoader {
         for (URL input : inputs) {
             // Load the current file
             loadFile(input, (name, data) -> {
-                rawData.put(name, data);
+                if (!library) {
+                    rawData.put(name, data);
+                }
 
                 // Check if the current entry is a class file
                 if (!name.endsWith(".class")) {
@@ -73,7 +76,7 @@ public class InputLoader {
                         ClassNode node = new ClassNode();
 
                         // Read the class
-                        classReader.accept(node, ClassReader.SKIP_DEBUG);
+                        classReader.accept(node, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
 
                         return node;
                     });
@@ -96,7 +99,7 @@ public class InputLoader {
             }
         }
 
-        return new ReadInput(output, rawData);
+        return new ReadInput(output, library ? null : rawData);
     }
 
     public static class ReadInput {
