@@ -16,7 +16,6 @@ import org.objectweb.asm.Type;
 import java.util.Collections;
 
 import static org.objectweb.asm.Type.*;
-import static org.objectweb.asm.Type.DOUBLE;
 
 public class AllocArrayExpr extends Expr {
     private final Type arrayType;
@@ -32,11 +31,15 @@ public class AllocArrayExpr extends Expr {
 
     @Override
     public void toString(TabbedStringWriter printer) {
-        printer.print("allocArray(" + this.arrayType + ", ");
+        printer.print("alloc_array<" + this.arrayType + ">(");
 
         this.count.toString(printer);
 
         printer.print(")");
+    }
+
+    public Expr getCount() {
+        return count;
     }
 
     @Override

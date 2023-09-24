@@ -1,10 +1,10 @@
 package net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.properties;
 
-public class LocksProperty extends ExprProperty {
+public class LocksProperty extends InstProperty {
 
     @Override
-    public boolean conflictsWith(ExprProperty other) {
-        return other instanceof ThrowsProperty || other instanceof WritesMemoryProperty;
+    public boolean conflictsWith(InstProperty other) {
+        return other instanceof ThrowsProperty || other instanceof WritesMemoryProperty || other instanceof ReadsMemoryProperty;
     }
 
     @Override

@@ -4,7 +4,7 @@ import net.superblaubeere27.masxinlingvaj.compiler.tree.MethodOrFieldIdentifier;
 
 import java.util.Objects;
 
-public class WritesMemoryProperty extends ExprProperty {
+public class WritesMemoryProperty extends InstProperty {
     public static final WritesMemoryProperty INSTANCE = new WritesMemoryProperty();
     private final MethodOrFieldIdentifier writtenField;
 
@@ -21,7 +21,7 @@ public class WritesMemoryProperty extends ExprProperty {
     }
 
     @Override
-    public boolean conflictsWith(ExprProperty other) {
+    public boolean conflictsWith(InstProperty other) {
         return other instanceof ReadsMemoryProperty && (this.writtenField == null || ((ReadsMemoryProperty) other).getWrittenField() == null || this.writtenField.equals(((ReadsMemoryProperty) other).getWrittenField()));
     }
 

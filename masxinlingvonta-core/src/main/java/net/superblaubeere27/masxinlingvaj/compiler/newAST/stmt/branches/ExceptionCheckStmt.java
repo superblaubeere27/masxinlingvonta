@@ -1,14 +1,14 @@
 package net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches;
 
-import net.superblaubeere27.masxinlingvaj.compiler.jni.JNIEnv;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.BasicBlock;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.CodeUnit;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.ImmToLLVMIRCompiler;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.Stmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.TabbedStringWriter;
-import org.bytedeco.llvm.global.LLVM;
 
 public class ExceptionCheckStmt extends BranchStmt {
+    public static final int ON_OK_IDX = 0;
+    public static final int ON_EXCEPTION_IDX = 1;
 
     public ExceptionCheckStmt(BasicBlock okTarget, BasicBlock exceptionTarget) {
         super(EXCEPTION_CHECK, new BasicBlock[]{okTarget, exceptionTarget});

@@ -30,7 +30,7 @@ public class FloatingPointArithmeticsExpr extends Expr {
 
     @Override
     public void toString(TabbedStringWriter printer) {
-        printer.print(this.op.getOperatorName() + " " + this.lhs + ", " + this.rhs);
+        printer.print(this.getOpName() + " " + this.lhs + ", " + this.rhs);
     }
 
     @Override
@@ -40,11 +40,9 @@ public class FloatingPointArithmeticsExpr extends Expr {
 
     @Override
     public boolean equivalent(CodeUnit s) {
-        if (!(s instanceof FloatingPointArithmeticsExpr)) {
+        if (!(s instanceof FloatingPointArithmeticsExpr other)) {
             return false;
         }
-
-        var other = ((FloatingPointArithmeticsExpr) s);
 
         return other.op == this.op && other.lhs.equivalent(this.rhs) && other.rhs.equivalent(this.rhs);
     }
@@ -89,20 +87,26 @@ public class FloatingPointArithmeticsExpr extends Expr {
         var lhs = this.lhs.compile(ctx);
         var rhs = this.rhs.compile(ctx);
 
+        var opName = getOpName();
+
         switch (this.op) {
             case ADD:
-                return LLVM.LLVMBuildFAdd(builder, lhs, rhs, "fadd");
+                return LLVM.LLVMBuildFAdd(builder, lhs, rhs, opName);
             case SUB:
-                return LLVM.LLVMBuildFSub(builder, lhs, rhs, "fsub");
+                return LLVM.LLVMBuildFSub(builder, lhs, rhs, opName);
             case MUL:
-                return LLVM.LLVMBuildFMul(builder, lhs, rhs, "fmul");
+                return LLVM.LLVMBuildFMul(builder, lhs, rhs, opName);
             case DIV:
-                return LLVM.LLVMBuildFDiv(builder, lhs, rhs, "fdiv");
+                return LLVM.LLVMBuildFDiv(builder, lhs, rhs, opName);
             case REM:
-                return LLVM.LLVMBuildFRem(builder, lhs, rhs, "frem");
+                return LLVM.LLVMBuildFRem(builder, lhs, rhs, opName);
             default:
                 throw new IllegalStateException("Unexpected value: " + this.op);
         }
+    }
+
+    private String getOpName() {
+        return (this.type == FloatingPointType.FLOAT ? 'f' : 'd') + this.op.getOperatorName();
     }
 
     public enum FloatingPointType {
@@ -121,11 +125,11 @@ public class FloatingPointArithmeticsExpr extends Expr {
     }
 
     public enum Operator {
-        ADD("fadd", true),
-        SUB("fsub", false),
-        MUL("fmul", true),
-        DIV("fdiv", false),
-        REM("frem", false);
+        ADD("add", true),
+        SUB("sub", false),
+        MUL("mul", true),
+        DIV("div", false),
+        REM("rem", false);
 
         private final String operatorName;
         private final boolean canSwap;

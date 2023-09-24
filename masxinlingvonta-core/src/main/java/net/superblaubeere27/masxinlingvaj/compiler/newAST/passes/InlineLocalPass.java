@@ -63,11 +63,9 @@ public class InlineLocalPass extends Pass {
 
             for (BasicBlock block : cfg.vertices()) {
                 for (Stmt stmt : block) {
-                    if (!(stmt instanceof CopyVarStmt)) {
+                    if (!(stmt instanceof CopyVarStmt varStmt)) {
                         continue;
                     }
-
-                    CopyVarStmt varStmt = (CopyVarStmt) stmt;
 
                     Local local = varStmt.getVariable().getLocal();
 
@@ -93,7 +91,7 @@ public class InlineLocalPass extends Pass {
         } while (changed);
     }
 
-    private boolean simplifyPhis(ControlFlowGraph cfg) {
+    public static boolean simplifyPhis(ControlFlowGraph cfg) {
         var transaction = new StatementTransaction();
 
         for (BasicBlock vertex : cfg.vertices()) {

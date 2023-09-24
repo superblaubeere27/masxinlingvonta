@@ -2,7 +2,7 @@ package net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.properties;
 
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.Local;
 
-public class ReadsLocalProperty extends ExprProperty {
+public class ReadsLocalProperty extends InstProperty {
     private final Local target;
 
     public ReadsLocalProperty(Local target) {
@@ -14,7 +14,7 @@ public class ReadsLocalProperty extends ExprProperty {
     }
 
     @Override
-    public boolean conflictsWith(ExprProperty other) {
+    public boolean conflictsWith(InstProperty other) {
         return other instanceof ChangesLocalProperty && (this.target.equals(((ChangesLocalProperty) other).getTarget()) || ((ChangesLocalProperty) other).getTarget() == null);
     }
 

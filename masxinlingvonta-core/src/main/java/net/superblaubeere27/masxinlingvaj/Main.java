@@ -1,6 +1,7 @@
 package net.superblaubeere27.masxinlingvaj;
 
 import net.superblaubeere27.masxinlingvaj.compiler.MLVCompiler;
+import net.superblaubeere27.masxinlingvaj.compiler.OptimizerSettings;
 import net.superblaubeere27.masxinlingvaj.compiler.tree.CompilerClass;
 import net.superblaubeere27.masxinlingvaj.compiler.tree.CompilerMethod;
 import net.superblaubeere27.masxinlingvaj.preprocessor.AbstractPreprocessor;
@@ -18,7 +19,7 @@ import static org.bytedeco.llvm.global.LLVM.LLVMDumpModule;
 import static org.bytedeco.llvm.global.LLVM.LLVMPrintModuleToFile;
 
 public class Main {
-    public static final boolean RUN_TESTS = true;
+    public static final boolean RUN_TESTS = false;
     private static final ExecutorServiceFactory EXECUTOR_SERVICE_FACTORY = () -> Executors.newFixedThreadPool(12);
     private static final String[] LIBRARIES = {
             "C:/Users/superblaubeere27/.jdks/adopt-openjdk-1.8.0_302/jre/lib/charsets.jar",
@@ -63,8 +64,10 @@ public class Main {
                                 if ((method.getNode().access & (Opcodes.ACC_NATIVE | Opcodes.ACC_ABSTRACT)) != 0)
                                     continue;
                                 if (method.getNode().name.startsWith("<")
+                                        || method.getIdentifier().getName().equals("main")
 //                                        || RUN_TESTS && !method.getNode().name.startsWith("setup")
                                         || RUN_TESTS && !method.getNode().name.startsWith("test")
+                                        || !RUN_TESTS && !(method.getIdentifier().toString().startsWith("APathfinding") || method.getIdentifier().toString().startsWith("Frame"))
 //                                        || !method.getParent().getName().equals("Test$Vec3") || !method.getNode().name.equals("absSquared")
                                 )
                                     continue;
@@ -84,7 +87,7 @@ public class Main {
         ));
 
         if (!RUN_TESTS) {
-            mlv.loadInput(new File("D:\\Projects\\IntelliJ\\mlv-test-generator\\cc\\cc.jar"));
+            mlv.loadInput(new File("testJars/APathfinding-Visual.jar"));
         } else {
             mlv.loadInput(new File("testJars/Test.jar"));
         }
@@ -98,10 +101,10 @@ public class Main {
         }).collect(Collectors.toList()));
 
 
-        mlv.preprocessAndCompile();
+        mlv.preprocessAndCompile(new OptimizerSettings(true));
 
         if (!RUN_TESTS) {
-            mlv.writeOutput(new File("D:\\Projects\\IntelliJ\\mlv-test-generator\\cc\\cc-obf.jar"));
+            mlv.writeOutput(new File("testJars/APathfinding-Visual-obf.jar"));
         } else {
             mlv.writeOutput(new File("testJars/Test-obf.jar"));
         }

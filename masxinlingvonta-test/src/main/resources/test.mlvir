@@ -1,0 +1,25 @@
+java/lang/Throwable.fillInStackTrace()Ljava/lang/Throwable;:
+L6:
+   %7A = params[0];
+   %10A = ((java/lang/Throwable) %7A).stackTrace@[Ljava/lang/StackTraceElement;;
+   %0Z = %10A === null;
+   delete %10A;
+   br %0Z if L9, else L12
+L9:
+   %13A = ((java/lang/Throwable) %7A).backtrace@Ljava/lang/Object;;
+   %1Z = %13A === null;
+   delete %13A;
+   br %1Z if L2, else L12
+L12:
+   ((java/lang/Throwable) %7A).fillInStackTrace(I)Ljava/lang/Throwable;<INVOKE_SPECIAL>(0);
+   br L15, on_exception L3
+L3:
+   delete %7A;
+   ret null
+L15:
+   %18A = java/lang/Throwable::UNASSIGNED_STACK@[Ljava/lang/StackTraceElement;;
+   ((java/lang/Throwable) %7A).stackTrace@[Ljava/lang/StackTraceElement; = %18A;
+   delete %18A;
+   br L2
+L2:
+   ret %7A

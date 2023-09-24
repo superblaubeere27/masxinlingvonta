@@ -16,12 +16,14 @@ public class OutputWriter {
     public static HashMap<String, byte[]> encodeChangedClasses(MLVCompiler compiler, HashMap<String, byte[]> rawData) {
         var outputMap = new HashMap<String, byte[]>();
 
+        var classLoader = new OutputClassLoader(rawData);
+
         for (CompilerClass aClass : compiler.getIndex().getClasses()) {
             if (!aClass.getModifiedFlag()) {
                 continue;
             }
 
-            ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+            OutputClassWriter classWriter = new OutputClassWriter(classLoader);
 
             aClass.getClassNode().accept(classWriter);
 
@@ -46,6 +48,41 @@ public class OutputWriter {
         }
 
         zipOutputStream.close();
+    }
+
+    private static final class OutputClassWriter extends ClassWriter {
+        private final OutputClassLoader classLoader;
+
+        public OutputClassWriter(OutputClassLoader classLoader) {
+            super(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+
+            this.classLoader = classLoader;
+        }
+
+        @Override
+        protected ClassLoader getClassLoader() {
+            return this.classLoader;
+        }
+    }
+
+    private static final class OutputClassLoader extends ClassLoader {
+        private final HashMap<String, byte[]> data;
+        private final HashMap<String, Class<?>> loadedClasses = new HashMap<>();
+
+        private OutputClassLoader(HashMap<String, byte[]> data) {
+            this.data = data;
+        }
+
+        @Override
+        protected Class<?> findClass(String name) throws ClassNotFoundException {
+            var data = this.data.get(name + ".class");
+
+            if (data != null) {
+                return this.loadedClasses.computeIfAbsent(name, (x) -> defineClass(x, data, 0, data.length));
+            }
+
+            return super.findClass(name);
+        }
     }
 
 }

@@ -16,10 +16,8 @@ import net.superblaubeere27.masxinlingvaj.compiler.tree.MethodOrFieldIdentifier;
 import org.bytedeco.javacpp.PointerPointer;
 import org.bytedeco.llvm.LLVM.LLVMValueRef;
 import org.bytedeco.llvm.global.LLVM;
-import org.objectweb.asm.Type;
 
 import java.util.Arrays;
-import java.util.Objects;
 
 public class InvokeInstanceExpr extends InvokeExpr {
     private InvokeInstanceType type;
@@ -84,6 +82,17 @@ public class InvokeInstanceExpr extends InvokeExpr {
     @Override
     public Expr copy() {
         return new InvokeInstanceExpr(type, this.target, Arrays.stream(this.children, 0, this.argTypes.length + 1).map(Expr::copy).toArray(Expr[]::new));
+    }
+
+    @Override
+    public Expr[] getChildrenInStackOrder() {
+        Expr[] params = new Expr[this.argTypes.length + 1];
+
+        params[0] = this.read(this.argTypes.length);
+
+        System.arraycopy(this.children, this.getChildPointer(), params, 1, this.argTypes.length);
+
+        return params;
     }
 
     @Override

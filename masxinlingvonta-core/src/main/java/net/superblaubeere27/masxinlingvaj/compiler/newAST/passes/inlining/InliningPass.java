@@ -10,7 +10,9 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.VarExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.invoke.InvokeExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.invoke.InvokeInstanceExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.Pass;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.LocalVariableAnalyzer;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.inlining.heuristic.InliningHeuristic;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.instSimplify.ExpressionSimplifier;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.ExpressionStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.RetStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.RetVoidStmt;
@@ -20,6 +22,7 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.copy.AbstractCopy
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.copy.CopyPhiStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.copy.CopyVarStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.tree.CompilerMethod;
+import net.superblaubeere27.masxinlingvaj.compiler.tree.MethodOrFieldIdentifier;
 import org.objectweb.asm.Type;
 
 import java.util.ArrayList;
@@ -141,7 +144,7 @@ public class InliningPass extends Pass {
                         ((AbstractCopyStmt) copiedStmt).getVariable().refactorLocals(localMap);
 
                         if (copiedStmt instanceof CopyPhiStmt) {
-                            ((CopyPhiStmt) copiedStmt).getExpression().refactorBasicBlocks(basicBlockMap);
+                            ((CopyPhiStmt) copiedStmt).getExpression().refactorBasicBlocks(basicBlockMap, true);
                         }
                     }
 
@@ -195,6 +198,10 @@ public class InliningPass extends Pass {
      */
     private ArrayList<InvokeExpr> findInvokesOfInterest(ControlFlowGraph cfg) {
         var invokesOfInterest = new ArrayList<InvokeExpr>();
+        var invokeCounts = new HashMap<MethodOrFieldIdentifier, Integer>();
+        var analyzer = new LocalVariableAnalyzer(cfg);
+
+        analyzer.analyze();
 
         for (BasicBlock vertex : cfg.vertices()) {
             for (Stmt stmt : vertex) {
@@ -213,15 +220,26 @@ public class InliningPass extends Pass {
                     if (targetCfg == null)
                         continue;
 
-                    if (!heuristic.shouldInline(cfg, targetCfg))
-                        continue;
-
                     if (invokeExpr instanceof InvokeInstanceExpr && ((InvokeInstanceExpr) invokeExpr).getInvokeType() != InvokeInstanceExpr.InvokeInstanceType.INVOKE_SPECIAL)
                         continue;
 
+                    invokeCounts.put(target.getIdentifier(), invokeCounts.getOrDefault(target.getIdentifier(), 0) + 1);
                     invokesOfInterest.add(invokeExpr);
                 }
             }
+        }
+
+        for (int i = invokesOfInterest.size() - 1; i >= 0; i--) {
+            var invokeExpr = invokesOfInterest.get(i);
+            var target = this.compiler.getIndex().getMethod(invokeExpr.getTarget());
+            var targetCfg = this.methodCfgMap.get(target);
+
+            var targetAnalyzer = new LocalVariableAnalyzer(targetCfg, new ExpressionSimplifier(this.compiler.getIndex()), analyzer.getParameterAssumptionsOfInvoke(analyzer.getStatementSnapshot(invokeExpr.getRootParent()), invokeExpr), InliningHeuristic::getAdditionalAssumptions);
+
+            targetAnalyzer.analyze();
+
+            if (!heuristic.shouldInline(cfg, targetCfg, targetAnalyzer, invokeCounts.get(target.getIdentifier())))
+                invokesOfInterest.remove(i);
         }
 
         return invokesOfInterest;
@@ -239,7 +257,7 @@ public class InliningPass extends Pass {
 
                 var phi = ((CopyPhiStmt) possiblePhiStmt).getExpression();
 
-                phi.refactorBasicBlocks(entryPhiRefactorList);
+                phi.refactorBasicBlocks(entryPhiRefactorList, false);
             }
         }
     }

@@ -23,7 +23,7 @@ public class AllocObjectExpr extends Expr {
 
     @Override
     public void toString(TabbedStringWriter printer) {
-        printer.print("alloc(" + this.type + ")");
+        printer.print("alloc<" + this.type + ">()");
     }
 
     @Override

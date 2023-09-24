@@ -1,8 +1,7 @@
-package net.superblaubeere27.masxinlingvonta.test.compilerTests;
+package net.superblaubeere27.masxinlingvonta.test.compilerTests.lambda_codegen;
 
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 public class TestLambdaCodegen {
 

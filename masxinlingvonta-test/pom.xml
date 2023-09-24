@@ -7,13 +7,25 @@
         <groupId>net.superblaubeere27</groupId>
         <version>0.1.0-SNAPSHOT</version>
     </parent>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>16</source>
+                    <target>16</target>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>masxinlingvonta-test</artifactId>
 
     <properties>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
     </properties>
 
     <dependencies>
@@ -23,7 +35,17 @@
             <version>${parent.version}</version>
             <scope>provided</scope>
         </dependency>
-
+        <dependency>
+            <groupId>net.superblaubeere27</groupId>
+            <artifactId>masxinlingvonta-core</artifactId>
+            <version>${parent.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.antlr</groupId>
+            <artifactId>antlr4-runtime</artifactId>
+            <version>4.13.0</version>
+        </dependency>
     </dependencies>
 
 </project>

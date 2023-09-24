@@ -47,6 +47,14 @@ public enum ImmType {
         }
     }
 
+    public String getJVMTypeSignature() {
+        if (this == OBJECT) {
+            return "Ljava/lang/Object;";
+        } else {
+            return Character.toString(this.associatedCharacter);
+        }
+    }
+
     public static ImmType fromJNIType(JNIType jniType) {
         switch (jniType) {
             case VOID:

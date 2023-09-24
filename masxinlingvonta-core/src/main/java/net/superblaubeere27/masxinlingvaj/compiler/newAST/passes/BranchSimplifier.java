@@ -2,119 +2,79 @@ package net.superblaubeere27.masxinlingvaj.compiler.newAST.passes;
 
 import net.superblaubeere27.masxinlingvaj.compiler.graph.BasicFlowEdge;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.BasicBlock;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.Expr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.Opcode;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.Stmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.constants.ConstBoolExpr;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.LocalVariableAnalyzer;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.LocalInfoSnapshot;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.LocalVariableAnalyzer;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.instSimplify.ExpressionSimplifier;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches.BranchStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches.ConditionalBranch;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches.ExceptionCheckStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches.UnconditionalBranch;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.copy.CopyPhiStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.StatementTransaction;
 
 import java.util.Arrays;
-import java.util.Map;
+import java.util.Optional;
 
 public class BranchSimplifier {
 
-    public static void trySimplifyBranch(LocalVariableAnalyzer analyzer, StatementTransaction transaction, BranchStmt branch) {
+    public static void trySimplifyBranch(ExpressionSimplifier simplifier, LocalVariableAnalyzer analyzer, StatementTransaction transaction, BranchStmt branch) {
+        var actualTargetIndex = getBranchTargetIndexIfKnown(simplifier, branch, analyzer.getStatementSnapshot(branch), false);
+
+        if (actualTargetIndex.isEmpty())
+            return;
+
+        var actualTarget = branch.getNextBasicBlocks()[actualTargetIndex.get()];
+
+        // Remove references to basic blocks that will be untargeted and excise them if needed
+        for (BasicBlock nextBasicBlock : branch.getNextBasicBlocks()) {
+            if (nextBasicBlock.equals(actualTarget)) {
+                continue;
+            }
+
+            transaction.exciseEdgeAndUnreferencedBlocks(new BasicFlowEdge(branch.getBlock(), nextBasicBlock));
+        }
+
+        transaction.replaceStatementAndExtractSideEffects(branch, new UnconditionalBranch(actualTarget));
+    }
+
+    /**
+     * Returns the index of the branch that is taken.
+     */
+    public static Optional<Integer> getBranchTargetIndexIfKnown(ExpressionSimplifier simplifier, BranchStmt branch, LocalInfoSnapshot snapshot, boolean unconditionalCounts) {
         // Check if a branch has only one target
-        // i.e.: br i == 0 if L1 else L1 => br L!
+        // i.e.: br i == 0 if L1 else L1 => br L1
         if (!(branch instanceof UnconditionalBranch)) {
-            BasicBlock nextBasicBlock = branch.getNextBasicBlocks()[0];
+            BasicBlock firstNextBasicBlock = branch.getNextBasicBlocks()[0];
 
-            if (Arrays.stream(branch.getNextBasicBlocks()).allMatch(nextBasicBlock::equals)) {
-                transaction.replaceStatement(branch, new UnconditionalBranch(nextBasicBlock));
-
-                return;
+            if (Arrays.stream(branch.getNextBasicBlocks()).allMatch(firstNextBasicBlock::equals)) {
+                // All branch targets are equal, return the first
+                return Optional.of(0);
             }
         }
 
-        if (branch instanceof ExceptionCheckStmt) {
-            var exceptionCheckStmt = ((ExceptionCheckStmt) branch);
-
+        if (branch instanceof ExceptionCheckStmt exceptionCheckStmt) {
             var exceptionTarget = exceptionCheckStmt.getExceptionTarget();
             var okTarget = exceptionCheckStmt.getOkTarget();
 
-            var exceptionState = analyzer.getStatementSnapshot(branch).getCallGraphState().getExceptionState();
+            var exceptionState = snapshot.getCallGraphState().getExceptionState();
 
-            if (exceptionTarget.equals(okTarget)) {
-                transaction.replaceStatement(branch, new UnconditionalBranch(okTarget));
-            } else if (!exceptionState.isUnknown()) {
-                var trueTarget = exceptionState.getAssumedValue() ? exceptionTarget : okTarget;
-                var notTarget = exceptionState.getAssumedValue() ? okTarget : exceptionTarget;
-
-                notTarget.getGraph().exciseEdge(new BasicFlowEdge(branch.getBlock(), notTarget));
-
-                transaction.exciseBlockIfUnreferenced(notTarget);
-                transaction.replaceStatement(branch, new UnconditionalBranch(trueTarget));
+            if (!exceptionState.isUnknown()) {
+                return Optional.of(exceptionState.getAssumedValue() ? ExceptionCheckStmt.ON_EXCEPTION_IDX : ExceptionCheckStmt.ON_OK_IDX);
             } else if (isEquivalentForExceptionCheckBranch(okTarget, exceptionTarget)) {
-                exceptionTarget.getGraph().exciseEdge(new BasicFlowEdge(branch.getBlock(), exceptionTarget));
-
-                transaction.exciseBlockIfUnreferenced(exceptionTarget);
-
-                transaction.replaceStatement(branch, new UnconditionalBranch(okTarget));
+                return Optional.of(ExceptionCheckStmt.ON_OK_IDX); // Return the ok-target
             }
-        } else if (branch instanceof ConditionalBranch) {
-            var conditionalBranch = (ConditionalBranch) branch;
+        } else if (branch instanceof ConditionalBranch conditionalBranch) {
+            if ((simplifier == null ? conditionalBranch.getCond() : simplifier.simplifyExpressionIfPossible(snapshot, conditionalBranch.getCond())) instanceof ConstBoolExpr constBoolExpr) {
+                boolean trueValue = constBoolExpr.getValue();
 
-            if (conditionalBranch.getIfTarget().equals(conditionalBranch.getElseTarget())) {
-                transaction.replaceStatementAndExtractSideEffects(branch, new UnconditionalBranch(conditionalBranch.getIfTarget()));
-            } else if (conditionalBranch.getCond() instanceof ConstBoolExpr) {
-                boolean trueValue = ((ConstBoolExpr) conditionalBranch.getCond()).getValue();
-
-                var trueTarget = trueValue ? conditionalBranch.getIfTarget() : conditionalBranch.getElseTarget();
-                var notTarget = trueValue ? conditionalBranch.getElseTarget() : conditionalBranch.getIfTarget();
-
-                notTarget.getGraph().exciseEdge(new BasicFlowEdge(branch.getBlock(), notTarget));
-
-                transaction.exciseBlockIfUnreferenced(notTarget);
-                transaction.replaceStatement(branch, new UnconditionalBranch(trueTarget));
+                return Optional.of(trueValue ? ConditionalBranch.ON_IF_IDX : ConditionalBranch.ON_ELSE_IDX);
             }
+        } else if (branch instanceof UnconditionalBranch unconditionalBranch && unconditionalCounts) {
+            return Optional.of(0);
         }
 
-        // Simplify branches if the next block will just do the same jump. In the following case we could just straight
-        // jump to L6 if no exception occured.
-        // L1:
-        //    br L2, on_exception L34
-        // L2:
-        //    br L6, on_exception L34
-//        for (int i = 0; i < branch.getNextBasicBlocks().length; i++) {
-//            var nextBlock = branch.getNextBasicBlocks()[i];
-//
-//            var firstInstruction = nextBlock.get(0);
-//
-//            if (!(firstInstruction instanceof BranchStmt))
-//                continue;
-//
-//            // Check if the branches have equivalent conditions
-//            if (!((BranchStmt) firstInstruction).isConditionEquivalent(branch))
-//                continue;
-//
-//            var nextBranchBasicBlock = ((BranchStmt) firstInstruction).getNextBasicBlocks()[i];
-//
-//            // copy the branch and change the target to the next branches target
-//            var branchCopy = (BranchStmt) branch.copy();
-//
-//            branchCopy.getNextBasicBlocks()[i] = nextBranchBasicBlock;
-//
-//            if (Arrays.stream(branchCopy.getNextBasicBlocks()).noneMatch(x -> x.equals(nextBlock))) {
-//                nextBlock.getGraph().exciseEdge(new BasicFlowEdge(branch.getBlock(), nextBlock));
-//
-//                transaction.exciseBlockIfUnreferenced(nextBlock);
-//            }
-//
-//            for (Stmt stmt : nextBranchBasicBlock) {
-//                if (!(stmt instanceof CopyPhiStmt phi))
-//                    break;
-//
-//                phi.getExpression().setArgument(nextBranchBasicBlock, phi.getExpression().getArgument(nextBlock).copy());
-//            }
-//
-//            transaction.replaceStatement(branch, branchCopy);
-//        }
+        return Optional.empty();
     }
 
     private static boolean isEquivalentForExceptionCheckBranch(BasicBlock first, BasicBlock second) {

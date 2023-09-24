@@ -6,7 +6,6 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.Expr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.ImmType;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.codegen.FunctionCodegenContext;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.ExprMetadata;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.properties.ReadsMemoryProperty;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.TabbedStringWriter;
 import org.bytedeco.llvm.LLVM.LLVMValueRef;
 
@@ -38,6 +37,10 @@ public class ArrayLengthExpr extends Expr {
     @Override
     public boolean equivalent(CodeUnit s) {
         return s instanceof ArrayLengthExpr && ((ArrayLengthExpr) s).array.equivalent(this.array);
+    }
+
+    public Expr getArray() {
+        return array;
     }
 
     @Override

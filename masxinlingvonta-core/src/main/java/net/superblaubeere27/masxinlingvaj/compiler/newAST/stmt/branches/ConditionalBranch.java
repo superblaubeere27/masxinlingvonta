@@ -2,12 +2,11 @@ package net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches;
 
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.*;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.TabbedStringWriter;
-import org.bytedeco.llvm.global.LLVM;
-
-import java.util.Arrays;
 
 
 public class ConditionalBranch extends BranchStmt {
+    public static final int ON_IF_IDX = 0;
+    public static final int ON_ELSE_IDX = 1;
     private Expr cond;
 
     public ConditionalBranch(Expr cond, BasicBlock ifTarget, BasicBlock elseTarget) {
@@ -44,7 +43,7 @@ public class ConditionalBranch extends BranchStmt {
 
         this.cond.toString(printer);
 
-        printer.print(" if " + this.getIfTarget() + ", else " + this.getElseTarget() + ";");
+        printer.print(" if " + this.getIfTarget() + ", else " + this.getElseTarget());
     }
 
     @Override

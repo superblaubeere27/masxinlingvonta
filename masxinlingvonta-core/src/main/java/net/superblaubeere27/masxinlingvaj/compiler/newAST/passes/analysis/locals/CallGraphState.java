@@ -38,4 +38,8 @@ public class CallGraphState {
                 "exceptionState=" + exceptionState +
                 '}';
     }
+
+    public boolean equivalent(CallGraphState callGraphState) {
+        return this.exceptionState.equivalent(callGraphState.exceptionState);
+    }
 }

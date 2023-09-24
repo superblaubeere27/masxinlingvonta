@@ -7,6 +7,7 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.VarExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches.BranchStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.copy.AbstractCopyStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.copy.CopyPhiStmt;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.copy.CopyVarStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.NotifiedList;
 
 import java.util.*;
@@ -94,7 +95,7 @@ public class BasicBlock implements FastGraphVertex, Collection<Stmt> {
     }
 
     private String blockNameById(int id) {
-        return "L" + Integer.toString(id);
+        return "L" + id;
     }
 
     /**
@@ -122,7 +123,7 @@ public class BasicBlock implements FastGraphVertex, Collection<Stmt> {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, cfg);
+        return Objects.hash(id);
     }
 
     @Override
@@ -133,6 +134,8 @@ public class BasicBlock implements FastGraphVertex, Collection<Stmt> {
             return false;
 
         BasicBlock bb = (BasicBlock) o;
+
+        assert this.getGraph() == bb.getGraph();
 
         if (id == bb.id) {
             assert (relabelCount == bb.relabelCount);
@@ -164,6 +167,16 @@ public class BasicBlock implements FastGraphVertex, Collection<Stmt> {
             for (BasicBlock incoming : phiExpr.getArguments().keySet()) {
                 if (this.cfg.getEdges(incoming).stream().noneMatch(edge -> edge.dst().equals(this)))
                     throw new IllegalStateException("Too many phi parameters");
+            }
+        }
+
+        for (Stmt stmt : this) {
+            if (stmt != this.getTerminator() && stmt.isTerminating())
+                throw new IllegalStateException("Two terminating statements!");
+            if (stmt instanceof CopyVarStmt copyVar) {
+                if (!this.getGraph().getLocals().defs.get(copyVar.getVariable().getLocal()).equals(copyVar)) {
+                    throw new IllegalStateException("Double definition of " + copyVar.getVariable());
+                }
             }
         }
 

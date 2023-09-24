@@ -2,14 +2,16 @@ package net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.local
 
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.Local;
 
+import javax.annotation.Nonnull;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 public class LocalInfoSnapshot {
-    private final HashMap<Local, LocalInfo> localInfos;
+    private final HashMap<Local, Assumption> localInfos;
     private final CallGraphState callGraphState;
 
-    private LocalInfoSnapshot(HashMap<Local, LocalInfo> localInfos, CallGraphState callGraphState) {
+    private LocalInfoSnapshot(HashMap<Local, Assumption> localInfos, CallGraphState callGraphState) {
         this.localInfos = localInfos;
         this.callGraphState = callGraphState;
     }
@@ -18,37 +20,33 @@ public class LocalInfoSnapshot {
         return new LocalInfoSnapshot(new HashMap<>(), CallGraphState.create());
     }
 
-    public HashMap<Local, LocalInfo> getLocalInfos() {
+    public HashMap<Local, Assumption> getLocalInfos() {
         return localInfos;
     }
 
     public LocalInfoSnapshot merge(LocalInfoSnapshot other) {
         var newLocalInfos = new HashMap<>(this.localInfos);
 
-        for (Map.Entry<Local, LocalInfo> localLocalInfoEntry : other.localInfos.entrySet()) {
-            var currentLocalInfo = newLocalInfos.get(localLocalInfoEntry.getKey());
+        for (Map.Entry<Local, Assumption> localLocalInfoEntry : other.localInfos.entrySet()) {
+            var currentLocalInfo = this.getLocalInfo(localLocalInfoEntry.getKey());
 
-            if (currentLocalInfo != null) {
-                newLocalInfos.put(localLocalInfoEntry.getKey(), currentLocalInfo.merge(localLocalInfoEntry.getValue()));
-            } else {
-                newLocalInfos.put(localLocalInfoEntry.getKey(), localLocalInfoEntry.getValue());
-            }
+            newLocalInfos.put(localLocalInfoEntry.getKey(), currentLocalInfo.merge(Objects.requireNonNullElse(localLocalInfoEntry.getValue(), Assumption.NoAssumption.INSTANCE)));
         }
 
         return new LocalInfoSnapshot(newLocalInfos, callGraphState.merge(other.callGraphState));
     }
 
     public boolean isEquivalent(LocalInfoSnapshot other) {
-        for (Map.Entry<Local, LocalInfo> local : this.localInfos.entrySet()) {
-            var a = other.localInfos.get(local.getKey());
-            var b = local.getValue();
+        for (Map.Entry<Local, Assumption> local : this.localInfos.entrySet()) {
+            var a = other.getLocalInfo(local.getKey());
+            var b = Objects.requireNonNullElse(local.getValue(), Assumption.NoAssumption.INSTANCE);
 
-            if (a == null && b != null || b == null && a != null || a != null && !a.equivalent(b)) {
+            if (!a.equivalent(b)) {
                 return false;
             }
         }
 
-        return true;
+        return this.callGraphState.equivalent(other.callGraphState);
     }
 
     public CallGraphState getCallGraphState() {
@@ -59,12 +57,17 @@ public class LocalInfoSnapshot {
         return new LocalInfoSnapshot(new HashMap<>(this.localInfos), callGraphState.copy());
     }
 
-    public void putLocalInfo(Local local, LocalInfo localInfo) {
+    public void putLocalInfo(Local local, Assumption localInfo) {
         this.localInfos.put(local, localInfo);
     }
 
-    public ObjectLocalInfo getOrCreateObjectLocalInfo(Local local) {
-        return (ObjectLocalInfo) getLocalInfos().computeIfAbsent(local, t -> ObjectLocalInfo.create());
+    public Assumption getOrCreateLocalInfo(Local local) {
+        return getLocalInfos().computeIfAbsent(local, t -> Assumption.NoAssumption.INSTANCE);
+    }
+
+    @Nonnull
+    public Assumption getLocalInfo(Local local) {
+        return Objects.requireNonNullElse(getLocalInfos().get(local), Assumption.NoAssumption.INSTANCE);
     }
 
     @Override

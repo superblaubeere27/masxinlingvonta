@@ -31,7 +31,7 @@ public class ObjectCompareExpr extends Expr {
     public void toString(TabbedStringWriter printer) {
         this.lhs.toString(printer);
 
-        printer.print(" == ");
+        printer.print(" === ");
 
         this.rhs.toString(printer);
     }

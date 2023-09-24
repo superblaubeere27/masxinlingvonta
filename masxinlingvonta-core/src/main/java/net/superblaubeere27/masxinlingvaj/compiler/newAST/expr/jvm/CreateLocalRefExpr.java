@@ -17,16 +17,18 @@ public class CreateLocalRefExpr extends Expr {
     public CreateLocalRefExpr(Expr instance) {
         super(CREATE_REF);
 
-        assert instance.getType() != ImmType.OBJECT;
+        assert instance.getType() == ImmType.OBJECT;
 
         writeAt(instance, 0);
     }
 
     @Override
     public void toString(TabbedStringWriter printer) {
-        printer.print("copy_ref ");
+        printer.print("copy_ref(");
 
         this.instance.toString(printer);
+
+        printer.print(')');
     }
 
     @Override

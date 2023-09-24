@@ -10,6 +10,7 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.TabbedStringWrit
 import org.bytedeco.llvm.LLVM.LLVMValueRef;
 import org.bytedeco.llvm.global.LLVM;
 
+import java.util.Arrays;
 import java.util.Collections;
 
 public class FloatingPointCompareExpr extends Expr {
@@ -30,11 +31,15 @@ public class FloatingPointCompareExpr extends Expr {
 
     @Override
     public void toString(TabbedStringWriter printer) {
+        printer.print((this.type == FloatingPointArithmeticsExpr.FloatingPointType.FLOAT ? "fcmp" : "dcmp") + "(" + this.operator.getOperatorName() + ", ");
+
         this.lhs.toString(printer);
 
-        printer.print(" " + this.operator.getOperatorName() + " ");
+        printer.print(", ");
 
         this.rhs.toString(printer);
+
+        printer.print(")");
     }
 
     @Override
@@ -96,6 +101,10 @@ public class FloatingPointCompareExpr extends Expr {
             this.operatorName = operatorName;
             this.llvmOpcode = llvmOpcode;
             this.canSwap = canSwap;
+        }
+
+        public static Operator getByName(String name) {
+            return Arrays.stream(values()).filter(x -> x.operatorName.equals(name)).findFirst().orElseThrow(() -> new IllegalArgumentException("Invalid fcmp opcode " + name));
         }
 
         public String getOperatorName() {

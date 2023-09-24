@@ -18,7 +18,7 @@ public class CompilerMethod {
 
     private BytecodeMethodAnalyzer.MethodInfo methodAnalysisInfo = null;
 
-    CompilerMethod(CompilerClass cc, MethodNode methodNode) {
+    public CompilerMethod(CompilerClass cc, MethodNode methodNode) {
         this.parent = cc;
         this.identifier = new MethodOrFieldIdentifier(cc.getName(), methodNode.name, methodNode.desc);
         this.methodNode = methodNode;

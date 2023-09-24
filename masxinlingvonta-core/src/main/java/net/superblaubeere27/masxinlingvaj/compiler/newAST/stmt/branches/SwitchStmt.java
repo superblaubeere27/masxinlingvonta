@@ -1,9 +1,7 @@
 package net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches;
 
-import net.superblaubeere27.masxinlingvaj.compiler.jni.JNIType;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.*;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.TabbedStringWriter;
-import org.bytedeco.llvm.global.LLVM;
 
 import java.util.Arrays;
 import java.util.stream.Collectors;
@@ -67,16 +65,18 @@ public class SwitchStmt extends BranchStmt {
 
     @Override
     public void toString(TabbedStringWriter printer) {
-        printer.print("switch " + IntStream.range(0, this.keys.length).mapToObj(x -> "[" + this.keys[x] + ": " + getNextBasicBlocks()[x] + "]").collect(Collectors.joining(", ")) + ", default: " + this.getNextBasicBlocks()[this.keys.length]);
+        printer.print("switch ");
+
+        this.operand.toString(printer);
+
+        printer.print(" " + IntStream.range(0, this.keys.length).mapToObj(x -> "[" + this.keys[x] + ": " + getNextBasicBlocks()[x] + "]").collect(Collectors.joining(", ")) + ", default: " + this.getNextBasicBlocks()[this.keys.length]);
     }
 
     @Override
     public boolean isConditionEquivalent(CodeUnit s) {
-        if (!(s instanceof SwitchStmt)) {
+        if (!(s instanceof SwitchStmt switchStatement)) {
             return false;
         }
-
-        SwitchStmt switchStatement = ((SwitchStmt) s);
 
         return Arrays.equals(switchStatement.keys, this.keys) && switchStatement.operand.equivalent(this.operand);
     }

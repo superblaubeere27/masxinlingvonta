@@ -1,11 +1,14 @@
 package net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.jvm;
 
-import net.superblaubeere27.masxinlingvaj.compiler.jni.JNIEnv;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.CodeUnit;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.Expr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.ImmToLLVMIRCompiler;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.Stmt;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.properties.ThrowsProperty;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.StmtMetadata;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.TabbedStringWriter;
+
+import java.util.Collections;
 
 public class ThrowStmt extends Stmt {
     private Expr object;
@@ -45,6 +48,10 @@ public class ThrowStmt extends Stmt {
     @Override
     public boolean equivalent(CodeUnit s) {
         return s instanceof ThrowStmt && ((ThrowStmt) s).object.equivalent(this.object);
+    }
+
+    public StmtMetadata getMetadata() {
+        return new StmtMetadata(Collections.singletonList(new ThrowsProperty(null)));
     }
 
     @Override

@@ -7,6 +7,8 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.*;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.PhiExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.VarExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.CreateLocalRefExpr;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.AssumptionPredicates;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.LocalVariableAnalyzer;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.RetStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches.BranchStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches.ConditionalBranch;
@@ -54,16 +56,34 @@ public class DeleteLocalsRefsPass extends Pass {
         return false;
     }
 
+    private static Local getReturnedVariableOfBlockOrNull(BasicBlock vertex) {
+        var terminator = vertex.getTerminator();
+
+        if (!(terminator instanceof RetStmt retStmt)) {
+            return null;
+        }
+
+        var retValue = retStmt.getValue();
+
+        if (!(retValue instanceof VarExpr returnedVarExpr)) {
+            return null;
+        }
+
+        return returnedVarExpr.getLocal();
+    }
+
     @Override
     public void apply(ControlFlowGraph cfg) {
-//        CycleDetector cycleDetector = new CycleDetector(cfg);
         var livenessAnalyser = new SSABlockLivenessAnalyser(cfg);
 
         livenessAnalyser.compute();
 
-//        HashMap<BasicBlock, HashSet<Local>> localLivenessMap = new HashMap<>();
+        var localAnalyzer = new LocalVariableAnalyzer(cfg);
+
+        localAnalyzer.analyze();
+
         HashMap<FlowEdge<BasicBlock>, Set<Local>> phiUsageMap = new HashMap<>();
-//
+
         step1(cfg, phiUsageMap);
 
         var deletes = new HashMap<FlowEdge<BasicBlock>, ArrayList<Local>>();
@@ -77,42 +97,24 @@ public class DeleteLocalsRefsPass extends Pass {
                     continue;
                 }
 
-//                // Can the ownership be transferred to a phi?
-//                boolean canMove = cfg.getEdges(vertex).stream().filter(x -> livenessAnalyser.in(x.dst()).contains(outVar) || phiUsageMap.containsKey(x) && phiUsageMap.get(x).contains(outVar)).count() <= 1;
-
                 for (FlowEdge<BasicBlock> edge : cfg.getEdges(vertex)) {
                     var inVars = livenessAnalyser.in(edge.dst());
                     var phiUsage = phiUsageMap.getOrDefault(edge, Collections.emptySet());
 
-                    // Can the variable be moved? Otherwise create a copy
-                    if (phiUsage.contains(outVar) && inVars.contains(outVar)) {
-//                        System.out.println(edge.toGraphString() + ": COPY " + outVar);
+                    // Can the variable be moved? Otherwise, create a copy
+                    var mustCopy = phiUsage.contains(outVar) && inVars.contains(outVar);
+                    var canBeKilled = !inVars.contains(outVar) && !phiUsage.contains(outVar);
 
+                    if (mustCopy) {
                         copies.computeIfAbsent(edge, e -> new ArrayList<>(outVars.size())).add(outVar);
-                    }
-
-                    if (!inVars.contains(outVar) && !phiUsage.contains(outVar)) {
-//                        System.out.println(edge.toGraphString() + ": KILL " + outVar);
-
+                    } else if (canBeKilled) {
                         deletes.computeIfAbsent(edge, e -> new ArrayList<>(outVars.size())).add(outVar);
                     }
                 }
             }
 
             // If there is a ret %0, remember %0, so we don't delete it
-            Local returnedVariable = null;
-
-            {
-                var terminator = vertex.getTerminator();
-
-                if (terminator instanceof RetStmt) {
-                    var retVal = ((RetStmt) terminator).getValue();
-
-                    if (retVal instanceof VarExpr) {
-                        returnedVariable = ((VarExpr) retVal).getLocal();
-                    }
-                }
-            }
+            var returnedVariable = getReturnedVariableOfBlockOrNull(vertex);
 
             List<Local> variablesToKill = new ArrayList<>();
 
@@ -121,7 +123,12 @@ public class DeleteLocalsRefsPass extends Pass {
             inVars.addAll(vertex.getDefinedVariables());
 
             for (Local inVar : inVars) {
-                if (inVar.getType() != ImmType.OBJECT || outVars.contains(inVar) || inVar.equals(returnedVariable) || isUsedByPhi(vertex, inVar))
+                if (inVar.getType() != ImmType.OBJECT)
+                    continue;
+
+                var isStillUsed = outVars.contains(inVar) || inVar.equals(returnedVariable) || isUsedByPhi(vertex, inVar);
+
+                if (isStillUsed)
                     continue;
 
                 variablesToKill.add(inVar);
@@ -136,7 +143,11 @@ public class DeleteLocalsRefsPass extends Pass {
                 }
             }
 
-            List<Stmt> stmtsToAdd = variablesToKill.stream().map(x -> new DeleteRefStmt(new VarExpr(x))).collect(Collectors.toList());
+            // Create delete statements for all variables that are not known to be null
+            List<Stmt> stmtsToAdd = variablesToKill.stream()
+                    .filter(x -> !localAnalyzer.getStatementSnapshot(vertex.getTerminator()).getLocalInfo(x).extractValue(AssumptionPredicates.GET_NULL_STATE_PREDICATE).orElse(false))
+                    .map(x -> new DeleteRefStmt(new VarExpr(x)))
+                    .collect(Collectors.toList());
 
             if (shallExtractCondition) {
                 var terminator = vertex.getTerminator();
@@ -180,7 +191,7 @@ public class DeleteLocalsRefsPass extends Pass {
             if (scheduledChange.getValue().isEmpty())
                 continue;
 
-            insertDeletes(cfg, scheduledChange.getKey(), scheduledChange.getValue());
+            insertDeletes(cfg, scheduledChange.getKey(), scheduledChange.getValue(), localAnalyzer);
         }
     }
 
@@ -210,10 +221,15 @@ public class DeleteLocalsRefsPass extends Pass {
         return newBlock;
     }
 
-    private void insertDeletes(ControlFlowGraph cfg, FlowEdge<BasicBlock> edge, ArrayList<Local> killedVars) {
+    private void insertDeletes(ControlFlowGraph cfg, FlowEdge<BasicBlock> edge, ArrayList<Local> killedVars, LocalVariableAnalyzer localAnalyzer) {
         BasicBlock newBlock = new BasicBlock(cfg);
 
         for (Local killedVar : killedVars) {
+            // Don't kill a null value
+            if (localAnalyzer.getBlockSnapshot(edge.dst()).getLocalInfo(killedVar).extractValue(AssumptionPredicates.GET_NULL_STATE_PREDICATE).orElse(false)) {
+                continue;
+            }
+
             newBlock.add(new DeleteRefStmt(new VarExpr(killedVar)));
         }
 

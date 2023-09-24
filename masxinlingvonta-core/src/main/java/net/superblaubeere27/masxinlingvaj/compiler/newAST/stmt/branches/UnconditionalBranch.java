@@ -19,7 +19,7 @@ public class UnconditionalBranch extends BranchStmt {
 
     @Override
     public void toString(TabbedStringWriter printer) {
-        printer.print("br " + this.getTarget().toString() + ";");
+        printer.print("br " + this.getTarget().toString());
     }
 
     public BasicBlock getTarget() {

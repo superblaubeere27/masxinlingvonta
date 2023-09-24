@@ -52,6 +52,10 @@ public class GetFieldExpr extends LoadFieldExpr {
         }
     }
 
+    public Expr getInstance() {
+        return instance;
+    }
+
     @Override
     public Expr copy() {
         return new GetFieldExpr(this.target, this.instance.copy());

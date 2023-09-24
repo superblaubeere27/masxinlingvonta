@@ -1,16 +1,22 @@
 package net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals;
 
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.ObjectTypeAssumptionState;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.PrimitiveAssumptionState;
 
-public final class ObjectLocalInfo extends LocalInfo {
-    private static final ObjectLocalInfo IDENTITY = new ObjectLocalInfo(PrimitiveAssumptionState.assumeUnknown(), ObjectTypeAssumptionState.assumeUnknown());
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+public final class ObjectLocalInfo extends Assumption {
+    private static final ObjectLocalInfo IDENTITY = new ObjectLocalInfo(PrimitiveAssumptionState.assumeUnknown(), NoAssumption.INSTANCE, ObjectTypeAssumptionState.assumeUnknown());
 
     private final PrimitiveAssumptionState<Boolean> isNull;
+    private final Assumption specialObjectAssumption;
     private final ObjectTypeAssumptionState objectType;
 
-    private ObjectLocalInfo(PrimitiveAssumptionState<Boolean> isNull, ObjectTypeAssumptionState objectType) {
+    private ObjectLocalInfo(PrimitiveAssumptionState<Boolean> isNull, Assumption specialObjectAssumption, ObjectTypeAssumptionState objectType) {
         this.isNull = isNull;
+        this.specialObjectAssumption = specialObjectAssumption;
         this.objectType = objectType;
     }
 
@@ -27,7 +33,7 @@ public final class ObjectLocalInfo extends LocalInfo {
     }
 
     public ObjectLocalInfo assumeIsNull(PrimitiveAssumptionState<Boolean> newAssumption) {
-        return new ObjectLocalInfo(newAssumption, objectType);
+        return new ObjectLocalInfo(newAssumption, specialObjectAssumption, objectType);
     }
 
     public ObjectLocalInfo assumeIsNull(boolean newAssumption) {
@@ -35,44 +41,96 @@ public final class ObjectLocalInfo extends LocalInfo {
     }
 
     public ObjectLocalInfo assumeObjectType(ObjectTypeAssumptionState.ObjectTypeInfo state) {
-        return new ObjectLocalInfo(this.isNull, this.objectType.assume(state));
+        return new ObjectLocalInfo(this.isNull, specialObjectAssumption, this.objectType.assume(state));
     }
 
-    @Override
-    public ObjectLocalInfo merge(LocalInfo other) {
-        if (other == null)
-            return IDENTITY;
+//    @Override
+//    public Assumption merge(Assumption other) {
+//        if (other == null)
+//            return IDENTITY;
+//
+//        if (!(other instanceof ObjectLocalInfo)) {
+//            return super.merge(other);
+//        }
+//
+//        var isNullMerged = this.isNull.merge(((ObjectLocalInfo) other).isNull);
+//
+//        var unknownThis = this.isNull.isUnknown();
+//        var unknownOther = ((ObjectLocalInfo) other).isNull.isUnknown();
+//
+//        var specialObjectMerged = this.specialObjectAssumption.merge(((ObjectLocalInfo) other).specialObjectAssumption);
+//
+//        if (!unknownThis && this.isNull.getAssumedValue())
+//            return new ObjectLocalInfo(isNullMerged, specialObjectMerged, ((ObjectLocalInfo) other).objectType);
+//
+//        if (!unknownOther && ((ObjectLocalInfo) other).isNull.getAssumedValue())
+//            return new ObjectLocalInfo(isNullMerged, specialObjectMerged, this.objectType);
+//
+//        var postMerge = objectType.merge(((ObjectLocalInfo) other).objectType);
+//
+//        return new ObjectLocalInfo(isNullMerged, specialObjectMerged, postMerge);
+//    }
 
-        if (!(other instanceof ObjectLocalInfo)) {
-            throw new IllegalArgumentException();
+
+    @Override
+    public Optional<Assumption> remapAssumptionForAnd(Assumption other) {
+        if (!(other instanceof ObjectLocalInfo objectLocalInfo))
+            return Optional.empty();
+
+        // revoke null assumption state if other assumption also has an assumption
+        var newIsNull = objectLocalInfo.isNull.isUnknown() ? this.isNull : PrimitiveAssumptionState.<Boolean>assumeUnknown();
+
+        var newTypeAssumptions = new ArrayList<>();
+
+        Outer:
+        for (ObjectTypeAssumptionState.ObjectTypeInfo info : this.objectType.getKnownInfos()) {
+            for (ObjectTypeAssumptionState.ObjectTypeInfo otherInfo : objectLocalInfo.objectType.getKnownInfos()) {
+                // If we know the type, we know the type. We don't need any more hints.
+                if (otherInfo.relation() == ObjectTypeAssumptionState.ObjectTypeRelation.IS_EXACTLY) {
+                    newTypeAssumptions.clear();
+
+                    break Outer;
+                }
+
+                // If the outer assumption already contained this assumption, this assumption is useless.
+                if (otherInfo.relation() == info.relation()) {
+                    continue Outer;
+                }
+            }
+
+            // All checks passed, this assumption is still relevant
+            newTypeAssumptions.add(info);
         }
 
-        var isNullMerged = this.isNull.merge(((ObjectLocalInfo) other).isNull);
+        if (newIsNull.isUnknown() && newTypeAssumptions.isEmpty())
+            return Optional.of(NoAssumption.INSTANCE);
 
-        var unknownThis = this.isNull.isUnknown();
-        var unknownOther = ((ObjectLocalInfo) other).isNull.isUnknown();
+        if (this.objectType.getKnownInfos().length == newTypeAssumptions.size() && newIsNull.equals(this.isNull)) {
+            return Optional.empty();
+        }
 
-        if (!unknownThis && this.isNull.getAssumedValue())
-            return new ObjectLocalInfo(isNullMerged, ((ObjectLocalInfo) other).objectType);
-
-        if (!unknownOther && ((ObjectLocalInfo) other).isNull.getAssumedValue())
-            return new ObjectLocalInfo(isNullMerged, this.objectType);
-
-        var postMerge = objectType.merge(((ObjectLocalInfo) other).objectType);
-
-        return new ObjectLocalInfo(isNullMerged, postMerge);
+        return Optional.of(new ObjectLocalInfo(newIsNull, NoAssumption.INSTANCE, new ObjectTypeAssumptionState(newTypeAssumptions.toArray(ObjectTypeAssumptionState.ObjectTypeInfo[]::new))));
     }
 
     @Override
-    public boolean equivalent(LocalInfo other) {
+    public boolean equivalent(Assumption other) {
         return other instanceof ObjectLocalInfo && this.isNull.equals(((ObjectLocalInfo) other).isNull) && this.objectType.equals(((ObjectLocalInfo) other).objectType);
     }
 
+
     @Override
     public String toString() {
-        return "ObjectLocalInfo{" +
-                "isNull=" + isNull +
-                ", objectType=" + objectType +
-                '}';
+        StringBuilder builder = new StringBuilder();
+
+        builder.append("(");
+
+        if (!this.isNull.isUnknown())
+            builder.append(this.isNull.getAssumedValue() ? "null" : "not-null").append(" ");
+
+        builder.append("[").append(Arrays.stream(this.objectType.getKnownInfos()).map(Record::toString).collect(Collectors.joining(", "))).append("]");
+
+        builder.append(")");
+
+        return builder.toString();
     }
 }

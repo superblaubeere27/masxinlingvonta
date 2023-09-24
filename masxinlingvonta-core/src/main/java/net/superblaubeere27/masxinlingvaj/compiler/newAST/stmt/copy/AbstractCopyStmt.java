@@ -94,7 +94,9 @@ public abstract class AbstractCopyStmt extends Stmt {
     public final void onAddition(BasicBlock basicBlock) {
         super.onAddition(basicBlock);
 
-        basicBlock.cfg.getLocals().defs.put(this.variable.getLocal(), this);
+        var previous = basicBlock.cfg.getLocals().defs.put(this.variable.getLocal(), this);
+
+//        assert !this.getVariable().getLocal().isSSA() || previous == null;
     }
 
     @Override

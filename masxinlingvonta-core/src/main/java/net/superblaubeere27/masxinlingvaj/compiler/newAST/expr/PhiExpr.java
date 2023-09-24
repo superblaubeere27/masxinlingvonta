@@ -6,6 +6,7 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.Expr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.ImmType;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.codegen.FunctionCodegenContext;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.TabbedStringWriter;
+import net.superblaubeere27.masxinlingvaj.utils.Pair;
 import org.bytedeco.llvm.LLVM.LLVMValueRef;
 import org.bytedeco.llvm.global.LLVM;
 
@@ -104,8 +105,7 @@ public class PhiExpr extends Expr {
 
     @Override
     public boolean equivalent(CodeUnit s) {
-        if (s instanceof PhiExpr) {
-            PhiExpr phi = (PhiExpr) s;
+        if (s instanceof PhiExpr phi) {
 
             Set<BasicBlock> sources = new HashSet<>();
             sources.addAll(arguments.keySet());
@@ -148,17 +148,41 @@ public class PhiExpr extends Expr {
         return phi;
     }
 
-    public void refactorBasicBlocks(HashMap<BasicBlock, BasicBlock> basicBlockMap) {
-        var sources = new ArrayList<>(this.getSources());
+    public void refactorBasicBlocks(HashMap<BasicBlock, BasicBlock> basicBlockMap, boolean expectExhaustive) {
+        var stuff = new ArrayList<>(this.getSources())
+                .stream()
+                .map(source -> {
+                    BasicBlock replacement = basicBlockMap.get(source);
 
-        for (BasicBlock source : sources) {
-            BasicBlock replacement = basicBlockMap.get(source);
+                    if (replacement != null) {
+                        var expr = this.removeArgument(source);
 
-            if (replacement != null) {
-                var expr = this.removeArgument(source);
+                        return new Pair<>(replacement, expr);
+                    }
 
-                this.setArgument(replacement, expr);
-            }
+                    return null;
+                })
+                .filter(Objects::nonNull)
+                .toList();
+
+        // If all arguments are replaced, they all should have been removed from this phi
+        if (expectExhaustive && this.getArgumentCount() > 0)
+            throw new IllegalStateException("Expected to replace all basic blocks");
+
+        for (Pair<BasicBlock, Expr> newPair : stuff) {
+            this.setArgument(newPair.getFirst(), newPair.getSecond());
         }
+
+//        var sources = new ArrayList<>(this.getSources());
+//
+//        for (BasicBlock source : sources) {
+//            BasicBlock replacement = basicBlockMap.get(source);
+//
+//            if (replacement != null) {
+//                var expr = this.removeArgument(source);
+//
+//                this.setArgument(replacement, expr);
+//            }
+//        }
     }
 }

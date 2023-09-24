@@ -1,4 +1,4 @@
-package net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis;
+package net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals;
 
 import org.objectweb.asm.Type;
 

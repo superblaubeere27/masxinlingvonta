@@ -5,8 +5,6 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.ImmToLLVMIRCompiler;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.Stmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.TabbedStringWriter;
 
-import static org.bytedeco.llvm.global.LLVM.LLVMBuildRetVoid;
-
 public class RetVoidStmt extends Stmt {
 
     public RetVoidStmt() {
@@ -20,7 +18,7 @@ public class RetVoidStmt extends Stmt {
 
     @Override
     public void toString(TabbedStringWriter printer) {
-        printer.print("ret void;");
+        printer.print("ret void");
     }
 
     @Override

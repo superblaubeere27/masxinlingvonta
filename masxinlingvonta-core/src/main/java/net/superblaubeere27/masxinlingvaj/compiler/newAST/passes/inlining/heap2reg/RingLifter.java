@@ -48,7 +48,12 @@ class RingLifter {
             var parent = varExpr.getParent();
 
             if (parent instanceof PutFieldStmt) {
-                stmtTransaction.replaceStatement((Stmt) parent, new CopyVarStmt(new VarExpr(fieldMap.get(new MethodOrFieldName(((PutFieldStmt) parent).getTarget()))), ((PutFieldStmt) parent).getValue().copy()));
+                var local = fieldMap.get(new MethodOrFieldName(((PutFieldStmt) parent).getTarget()));
+
+                if (local == null)
+                    "".length();
+
+                stmtTransaction.replaceStatement((Stmt) parent, new CopyVarStmt(new VarExpr(local), ((PutFieldStmt) parent).getValue().copy()));
             } else if (parent instanceof GetFieldExpr) {
                 stmtTransaction.replaceExpr((Expr) parent, new VarExpr(fieldMap.get(new MethodOrFieldName(((GetFieldExpr) parent).getTarget()))));
             } else if (parent instanceof PhiExpr) {

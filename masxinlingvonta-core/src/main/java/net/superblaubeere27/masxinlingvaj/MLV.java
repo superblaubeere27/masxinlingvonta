@@ -1,6 +1,7 @@
 package net.superblaubeere27.masxinlingvaj;
 
 import net.superblaubeere27.masxinlingvaj.compiler.MLVCompiler;
+import net.superblaubeere27.masxinlingvaj.compiler.OptimizerSettings;
 import net.superblaubeere27.masxinlingvaj.io.InputLoader;
 import net.superblaubeere27.masxinlingvaj.io.OutputWriter;
 import net.superblaubeere27.masxinlingvaj.postprocessor.CompilerPostprocessor;
@@ -42,8 +43,8 @@ public class MLV {
         this.libraries = InputLoader.loadFiles(jars, EXECUTOR_SERVICE_FACTORY, true);
     }
 
-    public void preprocessAndCompile() throws Exception {
-        this.compiler = new MLVCompiler(this.input.getClassNodes(), this.libraries.getClassNodes());
+    public void preprocessAndCompile(OptimizerSettings optimizerSettings) throws Exception {
+        this.compiler = new MLVCompiler(this.input.getClassNodes(), this.libraries.getClassNodes(), optimizerSettings);
 
         preprocessor.preprocess(compiler);
 

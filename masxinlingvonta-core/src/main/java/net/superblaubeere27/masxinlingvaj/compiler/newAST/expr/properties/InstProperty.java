@@ -1,12 +1,12 @@
 package net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.properties;
 
-public abstract class ExprProperty {
+public abstract class InstProperty {
 
     /**
      * Can an expression with this property be moved after another
      * expression with the given property
      */
-    public abstract boolean conflictsWith(ExprProperty other);
+    public abstract boolean conflictsWith(InstProperty other);
 
     /**
      * When this returns true, the annotated instruction might

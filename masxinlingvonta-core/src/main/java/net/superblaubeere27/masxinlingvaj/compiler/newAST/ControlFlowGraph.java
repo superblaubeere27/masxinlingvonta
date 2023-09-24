@@ -1,18 +1,24 @@
 package net.superblaubeere27.masxinlingvaj.compiler.newAST;
 
 import com.google.common.collect.Streams;
+import com.google.common.html.HtmlEscapers;
 import net.superblaubeere27.masxinlingvaj.compiler.graph.FlowEdge;
 import net.superblaubeere27.masxinlingvaj.compiler.graph.FlowGraph;
+import net.superblaubeere27.masxinlingvaj.compiler.graph.algorithm.LT79Dom;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.PhiExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.VarExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches.BranchStmt;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches.ConditionalBranch;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches.ExceptionCheckStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.copy.CopyPhiStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.CFGUtils;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.ChainIterator;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.TabbedStringWriter;
 import net.superblaubeere27.masxinlingvaj.compiler.tree.CompilerMethod;
-import net.superblaubeere27.masxinlingvaj.compiler.tree.MethodOrFieldIdentifier;
 
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.PrintStream;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -64,13 +70,11 @@ public class ControlFlowGraph extends FlowGraph<BasicBlock, FlowEdge<BasicBlock>
                 continue;
 
             for (Stmt stmt : block) {
-                if (!(stmt instanceof BranchStmt)) {
+                if (!(stmt instanceof BranchStmt branchStmt)) {
                     continue;
                 }
 
                 var prevLen = this.size();
-
-                BranchStmt branchStmt = (BranchStmt) stmt;
 
                 branchStmt.refactor(forwardedBlocks);
 
@@ -81,6 +85,10 @@ public class ControlFlowGraph extends FlowGraph<BasicBlock, FlowEdge<BasicBlock>
         }
 
         forwardedBlocks.keySet().forEach(this::exciseBlock);
+    }
+
+    public final int highestBlockId() {
+        return blockCounter;
     }
 
     public int makeBlockId() {
@@ -126,8 +134,7 @@ public class ControlFlowGraph extends FlowGraph<BasicBlock, FlowEdge<BasicBlock>
 
                 var argExpr = phi.getArgument(pred);
 
-                if (argExpr instanceof VarExpr) {
-                    VarExpr arg = (VarExpr) argExpr;
+                if (argExpr instanceof VarExpr arg) {
 
                     locals.uses.get(arg.getLocal()).remove(arg);
                 }
@@ -271,6 +278,20 @@ public class ControlFlowGraph extends FlowGraph<BasicBlock, FlowEdge<BasicBlock>
                 throw new IllegalStateException("dead incoming: " + b);
             }
 
+            var terminator = b.getTerminator();
+
+            var edges = getEdges(b);
+
+            HashSet<BasicBlock> nextBasicBlocks = new HashSet<>();
+
+            if (terminator instanceof BranchStmt branchStmt) {
+                nextBasicBlocks.addAll(Arrays.asList(branchStmt.getNextBasicBlocks()));
+            }
+
+            if (nextBasicBlocks.size() != edges.size())
+                throw new RuntimeException("Edges do not fit terminator");
+
+
             for (FlowEdge<BasicBlock> fe : getEdges(b)) {
                 if (fe.src() != b) {
                     throw new RuntimeException(fe + " from " + b);
@@ -283,6 +304,9 @@ public class ControlFlowGraph extends FlowGraph<BasicBlock, FlowEdge<BasicBlock>
                             fe + "; dst invalid: " + containsVertex(dst) + " : " + containsReverseVertex(dst));
                 }
 
+                if (!nextBasicBlocks.contains(fe.dst()))
+                    throw new RuntimeException("Edges do not fit terminator");
+
                 boolean found = getReverseEdges(dst).contains(fe);
 
                 if (!found) {
@@ -292,8 +316,62 @@ public class ControlFlowGraph extends FlowGraph<BasicBlock, FlowEdge<BasicBlock>
 
             b.checkConsistency();
         }
+
+        verifyCode();
+
 //        if (maxId != size())
 //            throw new IllegalStateException("Bad id numbering: " + size() + " vertices total, but max id is " + maxId);
+    }
+
+    private void verifyCode() {
+        var dominanceAnalyzer = new LT79Dom<>(this, this.getEntry());
+
+        // Check if all usages of locals are dominated by their declarations
+        this.vertices().stream().flatMap(Collection::stream).forEach(stmt -> {
+            if (stmt instanceof CopyPhiStmt copyPhiStmt) {
+                for (Map.Entry<BasicBlock, Expr> basicBlockExprEntry : copyPhiStmt.getExpression().getArguments().entrySet()) {
+                    var fromBlock = basicBlockExprEntry.getKey();
+                    var resultingExpression = basicBlockExprEntry.getValue();
+
+                    if (!(resultingExpression instanceof VarExpr varExpr))
+                        continue;
+
+                    verifyVariableAccess(dominanceAnalyzer, varExpr, fromBlock);
+                }
+
+                return;
+            }
+
+            for (Expr child : stmt.enumerateOnlyChildren()) {
+                if (child instanceof VarExpr varExpr && !(child.getParent() instanceof PhiExpr)) {
+                    verifyVariableAccess(dominanceAnalyzer, varExpr, varExpr.getBlock());
+                }
+            }
+        });
+    }
+
+    /**
+     * Verifies that every variable usage in the block is dominated by its declaration
+     */
+    private void verifyVariableAccess(LT79Dom<BasicBlock, FlowEdge<BasicBlock>> dominanceAnalyzer, VarExpr varExpr, BasicBlock declaringBlock) {
+        var declaringStatement = Objects.requireNonNull(this.getLocals().defs.get(varExpr.getLocal()), () -> "Variable " + varExpr + " has no definition.");
+        var declaringStatementDoms = dominanceAnalyzer.getDominates(declaringStatement.getBlock());
+
+        if (varExpr.getBlock() == declaringBlock) {
+            if (declaringBlock.indexOf(varExpr.getRootParent()) <= declaringBlock.indexOf(declaringStatement)) {
+                try (PrintStream writer = new PrintStream(new FileOutputStream("testJars/test.dot"))) {
+                    this.toGraphViz(writer);
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                }
+
+                throw new IllegalStateException("Variable " + varExpr + " in statement " + varExpr.getRootParent() + " is used before it's definition in " + declaringStatement);
+            }
+        }
+
+        if (!declaringStatementDoms.contains(declaringBlock)) {
+            throw new IllegalStateException("Variable " + varExpr + " in statement " + varExpr.getRootParent() + " is used before it's definition in " + declaringStatement);
+        }
     }
 
     public Set<FlowEdge<BasicBlock>> getPredecessors(Predicate<? super FlowEdge<BasicBlock>> e, BasicBlock b) {
@@ -306,6 +384,48 @@ public class ControlFlowGraph extends FlowGraph<BasicBlock, FlowEdge<BasicBlock>
         Stream<FlowEdge<BasicBlock>> s = getEdges(b).stream();
         s = s.filter(e);
         return s.collect(Collectors.toSet());
+    }
+
+    public void toGraphViz(PrintStream writer) {
+        writer.println("digraph cfg {");
+        writer.println("\tnode [fontname=\"Courier\"];"); // Set the font to a monospaced font
+
+        // Traverse the CFG and generate a node for each CFG node
+        for (BasicBlock node : this.vertices()) {
+            TabbedStringWriter tsw = new TabbedStringWriter();
+
+            CFGUtils.blockToString(tsw, this, node, 0);
+
+            writer.printf("\tn%d [label=<<table border=\"0\"><tr><td>%d</td></tr><tr><td align=\"left\">%s</td></tr></table>>];\n", node.getNumericId(), node.getNumericId(), HtmlEscapers.htmlEscaper().escape(tsw.toString()).replace("\n", "<br/>"));
+        }
+
+        // Traverse the CFG and generate an edge for each CFG edge
+        for (BasicBlock node : this.vertices()) {
+            var edges = this.getEdges(node);
+
+            var terminator = node.getTerminator();
+
+            if (terminator instanceof BranchStmt branchStmt) {
+                String[] labelTexts = null;
+
+                if (terminator instanceof ConditionalBranch) {
+                    labelTexts = new String[]{"[label=if]", "[label=else]"};
+                } else if (terminator instanceof ExceptionCheckStmt) {
+                    labelTexts = new String[]{"[label=ok]", "[label=ex]"};
+                }
+
+                for (int i = 0; i < branchStmt.getNextBasicBlocks().length; i++) {
+                    writer.printf("\tn%d -> n%d%s;\n", node.getNumericId(), branchStmt.getNextBasicBlocks()[i].getNumericId(), labelTexts == null ? "" : labelTexts[i]);
+                }
+            } else {
+                for (FlowEdge<BasicBlock> edge : edges) {
+                    writer.printf("\tn%d -> n%d;\n", edge.src().getNumericId(), edge.dst().getNumericId());
+                }
+            }
+        }
+
+        writer.println("}");
+        writer.close();
     }
 
     public ImmType getReturnType() {

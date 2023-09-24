@@ -1,22 +1,9 @@
 package net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.invoke;
 
-import net.superblaubeere27.masxinlingvaj.compiler.code.instructions.InvokeInstruction;
-import net.superblaubeere27.masxinlingvaj.compiler.jni.JNIType;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.CodeUnit;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.Expr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.ImmType;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.codegen.FunctionCodegenContext;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.ExprMetadata;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.properties.ReadsMemoryProperty;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.properties.ThrowsProperty;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.properties.WritesMemoryProperty;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.TabbedStringWriter;
 import net.superblaubeere27.masxinlingvaj.compiler.tree.MethodOrFieldIdentifier;
-import org.bytedeco.llvm.LLVM.LLVMValueRef;
 import org.objectweb.asm.Type;
-
-import java.util.Arrays;
-import java.util.Objects;
 
 public abstract class InvokeExpr extends Expr {
     protected final Type[] argTypes;
@@ -34,6 +21,11 @@ public abstract class InvokeExpr extends Expr {
             writeAt(args[i], i);
         }
     }
+
+    /**
+     * Gets the children in JVM stack order: instance, arg1, arg2
+     */
+    public abstract Expr[] getChildrenInStackOrder();
 
     @Override
     public final boolean isTerminating() {

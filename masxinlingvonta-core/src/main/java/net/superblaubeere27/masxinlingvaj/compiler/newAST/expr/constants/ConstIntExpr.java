@@ -36,6 +36,10 @@ public class ConstIntExpr extends ConstExpr {
         return s instanceof ConstIntExpr && ((ConstIntExpr) s).value == this.value;
     }
 
+    public int getValue() {
+        return value;
+    }
+
     @Override
     public void onChildUpdated(int ptr) {
         raiseChildOutOfBounds(ptr);

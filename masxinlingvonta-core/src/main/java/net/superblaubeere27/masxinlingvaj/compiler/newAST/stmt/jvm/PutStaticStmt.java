@@ -1,14 +1,15 @@
 package net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.jvm;
 
-import net.superblaubeere27.masxinlingvaj.compiler.jni.JNIEnv;
-import net.superblaubeere27.masxinlingvaj.compiler.jni.JNIType;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.CodeUnit;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.Expr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.ImmToLLVMIRCompiler;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.Stmt;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.properties.WritesMemoryProperty;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.StmtMetadata;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.TabbedStringWriter;
 import net.superblaubeere27.masxinlingvaj.compiler.tree.MethodOrFieldIdentifier;
-import org.objectweb.asm.Type;
+
+import java.util.Collections;
 
 public class PutStaticStmt extends Stmt {
     private final MethodOrFieldIdentifier target;
@@ -48,6 +49,10 @@ public class PutStaticStmt extends Stmt {
     @Override
     public boolean equivalent(CodeUnit s) {
         return s instanceof PutStaticStmt && ((PutStaticStmt) s).target.equals(this.target) && ((PutStaticStmt) s).value.equivalent(this.value);
+    }
+
+    public StmtMetadata getMetadata() {
+        return new StmtMetadata(Collections.singletonList(new WritesMemoryProperty(this.target)));
     }
 
     public Expr getValue() {

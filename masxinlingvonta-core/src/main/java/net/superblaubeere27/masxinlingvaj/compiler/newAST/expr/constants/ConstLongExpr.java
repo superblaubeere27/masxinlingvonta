@@ -46,6 +46,10 @@ public class ConstLongExpr extends ConstExpr {
         return new ConstLongExpr(this.value);
     }
 
+    public long getValue() {
+        return value;
+    }
+
     @Override
     public ImmType getType() {
         return ImmType.LONG;

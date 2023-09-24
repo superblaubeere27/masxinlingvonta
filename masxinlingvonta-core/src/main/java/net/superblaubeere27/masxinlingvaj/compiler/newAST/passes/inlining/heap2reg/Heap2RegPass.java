@@ -10,11 +10,7 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.Pass;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.LocalRingAnalyzer;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.jvm.PutFieldStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.StatementTransaction;
-import net.superblaubeere27.masxinlingvaj.compiler.tree.*;
-import org.objectweb.asm.Type;
-
-import java.util.HashMap;
-import java.util.stream.Collectors;
+import net.superblaubeere27.masxinlingvaj.compiler.tree.CompilerIndex;
 
 public class Heap2RegPass extends Pass {
     private final CompilerIndex index;
@@ -51,7 +47,7 @@ public class Heap2RegPass extends Pass {
             // Check if there are any instructions that reference the object that would disqualify it from being lifted
             // into registers
             for (VarExpr varExpr : locals.uses.getNonNull(variable)) {
-                if (!isViableUsage(varExpr.getParent()))
+                if (!isViableUsage(varExpr.getParent(), ring))
                     return null;
             }
 
@@ -76,14 +72,15 @@ public class Heap2RegPass extends Pass {
     /**
      * Does calling this expression on an object instance disqualify the object from being pulled into registers?
      */
-    private static boolean isViableUsage(CodeUnit parent) {
-        if (parent instanceof GetFieldExpr || parent instanceof PutFieldStmt)
+    private static boolean isViableUsage(CodeUnit parent, LocalRingAnalyzer.LocalVariableRing ring) {
+        var ringVars = ring.getVariables();
+
+        if (parent instanceof GetFieldExpr getField && getField.getInstance() instanceof VarExpr varExpr && ringVars.contains(varExpr.getLocal()))
+            return true;
+        if (parent instanceof PutFieldStmt getField && getField.getInstance() instanceof VarExpr varExpr && ringVars.contains(varExpr.getLocal()))
             return true;
 
-        if (parent instanceof PhiExpr)
-            return true;
-
-        return false;
+        return parent instanceof PhiExpr;
     }
 
     @Override
@@ -111,6 +108,8 @@ public class Heap2RegPass extends Pass {
             RingLifter lifter = new RingLifter(cfg, ring, targetClass);
 
             lifter.lift(stmtTransaction);
+
+            LocalRingAnalyzer.buildLocalRing(cfg);
         }
 
         if (stmtTransaction.apply()) {

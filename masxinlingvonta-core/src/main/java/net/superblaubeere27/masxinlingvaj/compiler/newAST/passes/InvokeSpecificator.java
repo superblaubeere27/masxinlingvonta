@@ -6,14 +6,17 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.Expr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.Stmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.VarExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.invoke.InvokeInstanceExpr;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.LocalVariableAnalyzer;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.ObjectType;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.ObjectTypeAssumptionState;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.LocalInfoSnapshot;
-import net.superblaubeere27.masxinlingvaj.compiler.tree.*;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.AssumptionAnalyzer;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.AssumptionPredicates;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.LocalVariableAnalyzer;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.ObjectType;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.ObjectTypeAssumptionState;
+import net.superblaubeere27.masxinlingvaj.compiler.tree.ClassHierarchyBuilder;
+import net.superblaubeere27.masxinlingvaj.compiler.tree.CompilerIndex;
+import net.superblaubeere27.masxinlingvaj.compiler.tree.CompilerMethod;
+import net.superblaubeere27.masxinlingvaj.compiler.tree.MethodOrFieldName;
 
 import java.util.*;
-import java.util.stream.Stream;
 
 public class InvokeSpecificator extends Pass {
     private final CompilerIndex compilerIndex;
@@ -45,9 +48,15 @@ public class InvokeSpecificator extends Pass {
                     var impls = ClassHierarchyBuilder.getPossibleImplementationsCached(this.compilerIndex, clazz, new MethodOrFieldName(call.getTarget()));
 
                     if (call.getInstanceExpr() instanceof VarExpr varExpr) {
-                        var assumption = analyzer.getStatementSnapshot(stmt).getOrCreateObjectLocalInfo(varExpr.getLocal()).getObjectTypeAssumption();
+                        var assumption = analyzer.getStatementSnapshot(stmt).getOrCreateLocalInfo(varExpr.getLocal());
 
-                        impls = filterByAssumptions(assumption, new MethodOrFieldName(call.getTarget()), impls);
+                        // Find out discrete values for object type
+                        var typeAssumptions = AssumptionAnalyzer.extractPossibleValues(assumption, AssumptionPredicates.GET_TYPE_ASSUMPTION_PREDICATE);
+
+                        // If discrete values where found, filter by them
+                        if (typeAssumptions.isPresent()) {
+                            impls = filterByAssumptionStates(typeAssumptions.get(), new MethodOrFieldName(call.getTarget()), impls);
+                        }
                     }
 
                     // Check if the call can be turned into a more specific call
@@ -63,10 +72,20 @@ public class InvokeSpecificator extends Pass {
         }
     }
 
+    private List<CompilerMethod> filterByAssumptionStates(HashSet<ObjectTypeAssumptionState> objectTypeAssumptionStates, MethodOrFieldName methodOrFieldName, List<CompilerMethod> impls) {
+        HashSet<CompilerMethod> possibleImplementations = new HashSet<>();
+
+        for (ObjectTypeAssumptionState objectTypeAssumptionState : objectTypeAssumptionStates) {
+            possibleImplementations.addAll(filterByAssumptionState(objectTypeAssumptionState, methodOrFieldName, impls));
+        }
+
+        return new ArrayList<>(possibleImplementations);
+    }
+
     /**
      * Sorts out all method implementations that are no candidates due to the assumption state {@code state}
      */
-    private List<CompilerMethod> filterByAssumptions(ObjectTypeAssumptionState state, MethodOrFieldName methodName, List<CompilerMethod> currentCandidates) {
+    private List<CompilerMethod> filterByAssumptionState(ObjectTypeAssumptionState state, MethodOrFieldName methodName, List<CompilerMethod> currentCandidates) {
         // Find out if we know the type
         Optional<ObjectType> exactTypeIfKnown = state.getExactTypeIfKnown();
 

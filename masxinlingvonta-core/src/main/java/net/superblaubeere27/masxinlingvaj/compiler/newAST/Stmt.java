@@ -1,7 +1,9 @@
 package net.superblaubeere27.masxinlingvaj.compiler.newAST;
 
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.VarExpr;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.StmtMetadata;
 
+import java.util.Collections;
 import java.util.Set;
 
 public abstract class Stmt extends CodeUnit {
@@ -57,6 +59,10 @@ public abstract class Stmt extends CodeUnit {
                 basicBlock.cfg.getLocals().uses.getNonNull(v.getLocal()).remove(v);
             }
         }
+    }
+
+    public StmtMetadata getMetadata() {
+        return new StmtMetadata(Collections.emptySet());
     }
 
     public Iterable<CodeUnit> enumerateWithSelf() {

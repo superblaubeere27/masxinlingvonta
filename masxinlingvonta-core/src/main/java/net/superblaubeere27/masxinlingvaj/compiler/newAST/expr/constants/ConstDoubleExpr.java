@@ -23,7 +23,7 @@ public class ConstDoubleExpr extends ConstExpr {
 
     @Override
     public void toString(TabbedStringWriter printer) {
-        printer.print(Double.toString(this.value));
+        printer.print(this.value + "D");
     }
 
     @Override

@@ -1,10 +1,10 @@
 package net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt;
 
-import net.superblaubeere27.masxinlingvaj.compiler.jni.JNIType;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.*;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.CodeUnit;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.Expr;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.ImmToLLVMIRCompiler;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.Stmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.TabbedStringWriter;
-import org.bytedeco.llvm.global.LLVM;
-import org.objectweb.asm.Type;
 
 public class RetStmt extends Stmt {
     private Expr value;
@@ -33,7 +33,7 @@ public class RetStmt extends Stmt {
 
     @Override
     public void toString(TabbedStringWriter printer) {
-        printer.print("ret " + this.value + ";");
+        printer.print("ret " + this.value);
     }
 
     @Override

@@ -16,10 +16,8 @@ import net.superblaubeere27.masxinlingvaj.compiler.tree.MethodOrFieldIdentifier;
 import org.bytedeco.javacpp.PointerPointer;
 import org.bytedeco.llvm.LLVM.LLVMValueRef;
 import org.bytedeco.llvm.global.LLVM;
-import org.objectweb.asm.Type;
 
 import java.util.Arrays;
-import java.util.stream.IntStream;
 
 public class InvokeStaticExpr extends InvokeExpr {
 
@@ -57,6 +55,11 @@ public class InvokeStaticExpr extends InvokeExpr {
     @Override
     public Expr copy() {
         return new InvokeStaticExpr(this.target, Arrays.stream(this.children, 0, this.argTypes.length).map(x -> x == null ? null : x.copy()).toArray(Expr[]::new));
+    }
+
+    @Override
+    public Expr[] getChildrenInStackOrder() {
+        return Arrays.copyOfRange(this.children, this.getChildPointer(), this.getChildPointer() + this.argTypes.length);
     }
 
     @Override

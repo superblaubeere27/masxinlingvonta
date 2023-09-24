@@ -1,14 +1,13 @@
-package net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis;
+package net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 public final class ObjectTypeAssumptionState {
     private static final ObjectTypeAssumptionState IDENTITY = new ObjectTypeAssumptionState(new ObjectTypeInfo[0]);
 
     private final ObjectTypeInfo[] knownInfos;
 
-    private ObjectTypeAssumptionState(ObjectTypeInfo[] knownInfos) {
+    ObjectTypeAssumptionState(ObjectTypeInfo[] knownInfos) {
         this.knownInfos = knownInfos;
     }
 

@@ -1,11 +1,14 @@
 package net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.jvm;
 
-import net.superblaubeere27.masxinlingvaj.compiler.jni.JNIEnv;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.CodeUnit;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.Expr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.ImmToLLVMIRCompiler;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.Stmt;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.properties.LocksProperty;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.StmtMetadata;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.TabbedStringWriter;
+
+import java.util.Collections;
 
 public class MonitorStmt extends Stmt {
     private final MonitorType type;
@@ -61,6 +64,10 @@ public class MonitorStmt extends Stmt {
     @Override
     public void compile(ImmToLLVMIRCompiler ctx) {
         ctx.compileMonitorStmt(this);
+    }
+
+    public StmtMetadata getMetadata() {
+        return new StmtMetadata(Collections.singletonList(new LocksProperty()));
     }
 
     public enum MonitorType {

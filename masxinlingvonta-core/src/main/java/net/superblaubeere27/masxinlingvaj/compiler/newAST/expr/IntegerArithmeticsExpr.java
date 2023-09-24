@@ -12,8 +12,8 @@ import org.bytedeco.llvm.global.LLVM;
 import java.util.Collections;
 
 public class IntegerArithmeticsExpr extends Expr {
-    private Operator op;
-    private IntegerType type;
+    private final Operator op;
+    private final IntegerType type;
     private Expr lhs;
     private Expr rhs;
 
@@ -31,7 +31,11 @@ public class IntegerArithmeticsExpr extends Expr {
 
     @Override
     public void toString(TabbedStringWriter printer) {
-        printer.print(this.op.getOperatorName() + " " + this.lhs + ", " + this.rhs);
+        if (this.type == IntegerType.INT) {
+            printer.print(this.op.getOperatorName() + " " + this.lhs + ", " + this.rhs);
+        } else {
+            printer.print('l' + this.op.getOperatorName() + " " + this.lhs + ", " + this.rhs);
+        }
     }
 
     @Override
@@ -41,11 +45,9 @@ public class IntegerArithmeticsExpr extends Expr {
 
     @Override
     public boolean equivalent(CodeUnit s) {
-        if (!(s instanceof IntegerArithmeticsExpr)) {
+        if (!(s instanceof IntegerArithmeticsExpr other)) {
             return false;
         }
-
-        var other = ((IntegerArithmeticsExpr) s);
 
         return other.op == this.op && other.lhs.equivalent(this.rhs) && other.rhs.equivalent(this.rhs);
     }

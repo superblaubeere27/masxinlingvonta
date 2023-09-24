@@ -80,4 +80,14 @@ public final class PrimitiveAssumptionState<T> {
                 ", assumedValue=" + assumedValue +
                 '}';
     }
+
+    public boolean equivalent(PrimitiveAssumptionState<T> other) {
+        if (this.isUnknown != other.isUnknown)
+            return false;
+
+        if (this.isUnknown)
+            return true;
+
+        return this.getAssumedValue().equals(other.getAssumedValue());
+    }
 }

@@ -2,39 +2,59 @@ package net.superblaubeere27.masxinlingvaj.compiler;
 
 import net.superblaubeere27.masxinlingvaj.analysis.BytecodeMethodAnalyzer;
 import net.superblaubeere27.masxinlingvaj.analysis.CallGraph;
-import net.superblaubeere27.masxinlingvaj.compiler.code.codegen.OnLoadBuilder;
 import net.superblaubeere27.masxinlingvaj.compiler.code.codegen.IntrinsicMethods;
+import net.superblaubeere27.masxinlingvaj.compiler.code.codegen.OnLoadBuilder;
 import net.superblaubeere27.masxinlingvaj.compiler.graph.SimpleDfs;
 import net.superblaubeere27.masxinlingvaj.compiler.graph.algorithm.RegisterToSSA;
+import net.superblaubeere27.masxinlingvaj.compiler.graph.algorithm.SSABlockLivenessAnalyser;
 import net.superblaubeere27.masxinlingvaj.compiler.jni.JNI;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.*;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.codegen.FunctionCodegenContext;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.*;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.inlining.heap2reg.Heap2RegPass;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.VarExpr;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.constants.ConstStringExpr;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.GetStaticExpr;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.invoke.InvokeInstanceExpr;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.DeleteLocalsRefsPass;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.InlineLocalPass;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.InvokeSpecificator;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.RedundantExpressionAndAssignmentRemover;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.cfg.CfgPruning;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.inlining.InliningPass;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.inlining.heap2reg.Heap2RegPass;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.instSimplify.InstSimplifyPass;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.instSimplify.ReuseLocalsPass;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.ExpressionStmt;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.copy.CopyPhiStmt;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.copy.CopyVarStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.tree.CompilerClass;
 import net.superblaubeere27.masxinlingvaj.compiler.tree.CompilerIndex;
 import net.superblaubeere27.masxinlingvaj.compiler.tree.CompilerMethod;
+import net.superblaubeere27.masxinlingvaj.compiler.tree.MethodOrFieldIdentifier;
 import net.superblaubeere27.masxinlingvaj.preprocessor.CompilerPreprocessor;
 import org.bytedeco.llvm.LLVM.LLVMModuleRef;
 import org.bytedeco.llvm.global.LLVM;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
 
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.PrintStream;
 import java.util.*;
 
 import static org.bytedeco.llvm.global.LLVM.LLVMModuleCreateWithName;
 
 public class MLVCompiler {
     private final CompilerIndex index;
-    private JNI jni;
-    private LLVMModuleRef module;
     private final IntrinsicMethods intrinsicMethods;
     private final OnLoadBuilder onLoadBuilder;
     private final HashMap<CompilerMethod, FunctionCodegenContext> functionCodegenContexts = new HashMap<>();
+    private final OptimizerSettings optimizerSettings;
+    private JNI jni;
+    private LLVMModuleRef module;
     private CallGraph callGraph;
 
-    public MLVCompiler(ArrayList<ClassNode> inputClasses, ArrayList<ClassNode> libraryClasses) {
+    public MLVCompiler(ArrayList<ClassNode> inputClasses, ArrayList<ClassNode> libraryClasses, OptimizerSettings optimizerSettings) {
+        this.optimizerSettings = optimizerSettings;
         this.index = new CompilerIndex(inputClasses, libraryClasses);
 
         this.index.buildHierarchy();
@@ -75,7 +95,8 @@ public class MLVCompiler {
                 wasNewMethodCompiled = true;
             }
 
-            runInlinePass(preprocessor, methodCfgMap);
+            if (this.optimizerSettings.inline())
+                runInlinePass(preprocessor, methodCfgMap);
 
             if (!wasNewMethodCompiled)
                 break;
@@ -85,6 +106,18 @@ public class MLVCompiler {
 
         for (ControlFlowGraph value : methodCfgMap.values()) {
             runPasses(value);
+
+            if (value.getCompilerMethod().getIdentifier().toString().contains("Test.testShit")) {
+                try (PrintStream writer = new PrintStream(new FileOutputStream("testJars/test.dot"))) {
+                    value.verify();
+                    value.toGraphViz(writer);
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                }
+
+//                addDebug(value, true);
+            }
+
         }
 
         for (Map.Entry<CompilerMethod, ControlFlowGraph> entry : methodCfgMap.entrySet()) {
@@ -104,6 +137,69 @@ public class MLVCompiler {
         }
 
         this.onLoadBuilder.compileMethods();
+    }
+
+    private void addDebug(ControlFlowGraph cfg, boolean debugVars) {
+        var livenessAnalyser = new SSABlockLivenessAnalyser(cfg);
+
+        livenessAnalyser.compute();
+
+        var sysout = cfg.getLocals().allocStatic(ImmType.OBJECT);
+
+        for (BasicBlock block : cfg.vertices()) {
+            var n = block.stream().takeWhile(x -> x instanceof CopyPhiStmt).count();
+            var printStatements = new ArrayList<Stmt>();
+
+            if (debugVars) {
+                printStatements.add(
+                        new ExpressionStmt(new InvokeInstanceExpr(
+                                new MethodOrFieldIdentifier("java/io/PrintStream", "print", "(Ljava/lang/String;)V"),
+                                new VarExpr(sysout),
+                                new Expr[]{new ConstStringExpr("Finished " + block + " [")},
+                                InvokeInstanceExpr.InvokeInstanceType.INVOKE_VIRTUAL))
+                );
+
+                boolean first = true;
+
+                for (Local local : livenessAnalyser.in(block)) {
+                    printStatements.add(
+                            new ExpressionStmt(new InvokeInstanceExpr(
+                                    new MethodOrFieldIdentifier("java/io/PrintStream", "print", "(Ljava/lang/String;)V"),
+                                    new VarExpr(sysout),
+                                    new Expr[]{new ConstStringExpr((first ? "" : ", ") + local + " = ")},
+                                    InvokeInstanceExpr.InvokeInstanceType.INVOKE_VIRTUAL))
+                    );
+
+                    printStatements.add(
+                            new ExpressionStmt(new InvokeInstanceExpr(
+                                    new MethodOrFieldIdentifier("java/io/PrintStream", "print", "(" + local.getType().getJVMTypeSignature() + ")V"),
+                                    new VarExpr(sysout),
+                                    new Expr[]{new VarExpr(local)},
+                                    InvokeInstanceExpr.InvokeInstanceType.INVOKE_VIRTUAL))
+                    );
+
+                    first = false;
+                }
+
+                printStatements.add(
+                        new ExpressionStmt(new InvokeInstanceExpr(
+                                new MethodOrFieldIdentifier("java/io/PrintStream", "println", "(Ljava/lang/String;)V"),
+                                new VarExpr(sysout),
+                                new Expr[]{new ConstStringExpr("]")},
+                                InvokeInstanceExpr.InvokeInstanceType.INVOKE_VIRTUAL))
+                );
+            } else {
+                printStatements.add(new ExpressionStmt(new InvokeInstanceExpr(
+                        new MethodOrFieldIdentifier("java/io/PrintStream", "println", "(Ljava/lang/String;)V"),
+                        new VarExpr(sysout),
+                        new Expr[]{new ConstStringExpr("Reached " + block)},
+                        InvokeInstanceExpr.InvokeInstanceType.INVOKE_VIRTUAL)));
+            }
+
+            block.addAll((int) n, printStatements);
+        }
+
+        cfg.getEntry().add(0, new CopyVarStmt(new VarExpr(sysout), new GetStaticExpr(new MethodOrFieldIdentifier("java/lang/System", "out", "Ljava/io/PrintStream;"))));
     }
 
     private void runInlinePass(CompilerPreprocessor preprocessor, HashMap<CompilerMethod, ControlFlowGraph> methodCfgMap) {
@@ -137,13 +233,15 @@ public class MLVCompiler {
 
         heap2RegPass.apply(cfg);
 
+        cfg.verify();
+
         optimize(cfg);
 
         DeleteLocalsRefsPass deleteLocalsRefsPass = new DeleteLocalsRefsPass();
 
         deleteLocalsRefsPass.apply(cfg);
 
-        optimize(cfg);
+        optimizeAfterDeleteLocals(cfg);
     }
 
     private ControlFlowGraph createControlFlowGraph(CompilerMethod method) throws AnalyzerException {
@@ -162,16 +260,25 @@ public class MLVCompiler {
 
         inlineLocalPass.apply(cfg);
 
+        cfg.verify();
+
         RedundantExpressionAndAssignmentRemover redundantExpressionAndAssignmentRemover = new RedundantExpressionAndAssignmentRemover();
 
         redundantExpressionAndAssignmentRemover.apply(cfg);
 
-        CallGraphPruningPass pruningPass = new CallGraphPruningPass();
+        cfg.verify();
+
+        CfgPruning pruningPass = new CfgPruning(this);
 
         pruningPass.apply(cfg);
 
         cfg.verify();
 
+        ReuseLocalsPass reuseLocalsPass = new ReuseLocalsPass();
+
+        reuseLocalsPass.apply(cfg);
+
+        cfg.verify();
 
         InstSimplifyPass simplifyPass = new InstSimplifyPass(this.index);
 
@@ -179,9 +286,19 @@ public class MLVCompiler {
 
         cfg.verify();
 
+        redundantExpressionAndAssignmentRemover.apply(cfg);
+
         InvokeSpecificator specificator = new InvokeSpecificator(this.index);
 
         specificator.apply(cfg);
+    }
+
+    private void optimizeAfterDeleteLocals(ControlFlowGraph cfg) {
+        CfgPruning pruningPass = new CfgPruning(this);
+
+        pruningPass.apply(cfg);
+
+        cfg.verify();
     }
 
     /**

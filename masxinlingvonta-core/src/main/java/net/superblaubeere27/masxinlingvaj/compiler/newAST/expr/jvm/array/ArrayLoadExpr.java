@@ -55,7 +55,7 @@ public class ArrayLoadExpr extends Expr {
 
         this.index.toString(writer);
 
-        writer.print("] (" + this.type.getDisplayName() + "[])");
+        writer.print("] (" + this.type.getDisplayName() + ")");
     }
 
     public Expr getArray() {
@@ -69,11 +69,9 @@ public class ArrayLoadExpr extends Expr {
 
     @Override
     public boolean equivalent(CodeUnit s) {
-        if (!(s instanceof ArrayLoadExpr)) {
+        if (!(s instanceof ArrayLoadExpr other)) {
             return false;
         }
-
-        var other = ((ArrayLoadExpr) s);
 
         return other.array.equivalent(this.array) && other.index.equivalent(this.index);
     }

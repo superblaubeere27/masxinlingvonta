@@ -3,15 +3,23 @@ package net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.inlining.heuri
 import net.superblaubeere27.masxinlingvaj.analysis.CallGraph;
 import net.superblaubeere27.masxinlingvaj.compiler.MLVCompiler;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.*;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.*;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.ParamExpr;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.PhiExpr;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.VarExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.AllocObjectExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.GetFieldExpr;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.array.ArrayLoadExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.invoke.InvokeExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.invoke.InvokeInstanceExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.LocalRingAnalyzer;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.ReachabilityAnalysis;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.Assumption;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.LocalVariableAnalyzer;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.ObjectLocalInfo;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.inlining.heap2reg.Heap2RegPass;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.RetStmt;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.jvm.*;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.jvm.ArrayStoreStmt;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.jvm.PutFieldStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.tree.CompilerMethod;
 
 import java.util.*;
@@ -21,8 +29,9 @@ import java.util.stream.IntStream;
 import static net.superblaubeere27.masxinlingvaj.compiler.newAST.Opcode.*;
 
 public class InliningHeuristic {
-    private static final int SPECIAL_INLINE_DISCOUNT = 10;
-    private static final int GENERAL_INLINE_DISCOUNT = 16;
+    private static final int BASIC_BLOCK_COST = 3;
+    private static final int SPECIAL_INLINE_DISCOUNT = 8;
+    private static final int GENERAL_INLINE_DISCOUNT = 50;
     private static final int OUTSOURCE_BOUNTY = 100;
     private final MLVCompiler compiler;
     private final CallGraph callGraph;
@@ -50,34 +59,67 @@ public class InliningHeuristic {
 
         switch (instruction.getOpcode()) {
             case PHI_STORE, LOCAL_LOAD, PHI, GET_PARAM, LOCAL_STORE, RET_VOID, RET, CONST_NULL, CONST_INT, CONST_LONG, CONST_FLOAT, CONST_DOUBLE -> {
-                return 0;
+                return cost;
             }
             case UNCONDITIONAL_BRANCH, CONDITIONAL_BRANCH, SWITCH -> {
-                return 1 + cost;
+                return cost;
             }
-            case CONST_STRING, CONST_TYPE, CATCH, OBJECT_COMPARE, ALLOC_OBJECT, ALLOC_ARRAY, ARRAY_LENGTH, MONITOR -> {
-                return 5;
+            case CONST_STRING, CONST_TYPE, CATCH, OBJECT_COMPARE, ALLOC_OBJECT, ALLOC_ARRAY, MONITOR -> {
+                return cost + 5;
             }
             case BINOP, NEGATION, PRIMITIVE_CAST, INTEGER_COMPARE, FLOAT_COMPARE -> {
-                return 1;
+                return cost + 1;
             }
-            case ARRAY_STORE, ARRAY_LOAD -> {
-                return 9;
+            case ARRAY_STORE -> {
+                return cost + (referencesParam(((ArrayStoreStmt) instruction).getArray(), true) ? -6 : 9);
             }
-            case GET_STATIC_FIELD, GET_FIELD, PUT_STATIC_FIELD, PUT_FIELD, INSTANCEOF, INVOKE_STATIC, INVOKE_INSTANCE -> {
-                return 7;
+            case ARRAY_LOAD -> {
+                return cost + (referencesParam(((ArrayLoadExpr) instruction).getArray(), true) ? -6 : 9);
+            }
+            case GET_STATIC_FIELD, PUT_STATIC_FIELD, INSTANCEOF, INVOKE_STATIC, INVOKE_INSTANCE -> {
+                return cost + 7;
+            }
+            case PUT_FIELD -> {
+                return cost + (referencesParam(((PutFieldStmt) instruction).getInstance(), false) ? -10 : 7);
+            }
+            case GET_FIELD -> {
+                return cost + (referencesParam(((GetFieldExpr) instruction).getInstance(), false) ? -10 : 7);
             }
             case CHECKCAST -> {
-                return 6;
+                return cost + 6;
             }
             case EXPR -> {
                 return cost;
             }
-            case EXCEPTION_CHECK, CREATE_REF, DELETE_REF, CLEAR_EXCEPTION -> {
-                return 3;
+            case EXCEPTION_CHECK, CREATE_REF, DELETE_REF, CLEAR_EXCEPTION, ARRAY_LENGTH -> {
+                return cost + 3;
             }
         }
         throw new IllegalStateException("Unexpected value: " + instruction.getOpcode());
+    }
+
+    static boolean referencesParam(Expr expr, boolean orFieldParam) {
+        if (expr instanceof ParamExpr) {
+            return true;
+        } else if (expr instanceof VarExpr varExpr) {
+            return referencesParam(expr.getBlock().getGraph().getLocals().defs.get(varExpr.getLocal()).getExpression(), orFieldParam);
+        } else if (expr instanceof GetFieldExpr getFieldExpr && orFieldParam) {
+            return referencesParam(getFieldExpr.getInstance(), false);
+        }
+
+        return false;
+    }
+
+    public static Assumption getAdditionalAssumptions(Assumption localInfo, Expr expr) {
+        if (expr instanceof GetFieldExpr getFieldExpr) {
+            if (referencesParam(getFieldExpr.getInstance(), false)) {
+                var info = ((ObjectLocalInfo) localInfo);
+
+                return (info == null ? ObjectLocalInfo.create() : info).assumeIsNull(false);
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -90,35 +132,15 @@ public class InliningHeuristic {
         if (parent instanceof PhiExpr)
             return true;
 
-        if (isReturnViable && parent instanceof RetStmt)
-            return true;
-
-        return false;
+        return isReturnViable && parent instanceof RetStmt;
     }
 
     public void invalidateCache(CompilerMethod method) {
         this.analysisCache.remove(method);
     }
 
-    /**
-     * @param cfg       The method that is inlined <i>into</i>
-     * @param targetCfg The method that <i>is</i> inlined
-     */
-    public boolean shouldInline(ControlFlowGraph cfg, ControlFlowGraph targetCfg) {
-        if (cfg.size() > 50) {
-            return false;
-        }
-
-        var liftableRings = findLiftableRings(cfg, false);
-
-        for (Map.Entry<LocalRingAnalyzer.LocalVariableRing, LiftabilityResult> liftableRing : liftableRings.entrySet()) {
-            if (liftableRing.getValue().methodsRequiringInliningAndCosts.containsKey(targetCfg.getCompilerMethod())
-                    && liftableRing.getValue().cost < OUTSOURCE_BOUNTY) {
-                return true;
-            }
-        }
-
-        return retrieveAnalysisInfo(targetCfg.getCompilerMethod()).generalInlineCost < GENERAL_INLINE_DISCOUNT;
+    private static int calculateSpecialInlineCost(int cost) {
+        return Math.max(cost - SPECIAL_INLINE_DISCOUNT, -3);
     }
 
     /**
@@ -146,16 +168,71 @@ public class InliningHeuristic {
         return result;
     }
 
-    private MethodAnalysisInfo analyzeMethod(ControlFlowGraph cfg) {
-        this.methodsAnalyzing.add(cfg.getCompilerMethod());
-
+    private static int calculateCost(ControlFlowGraph cfg) {
         var cost = 0;
 
-        for (BasicBlock entry : cfg.getEntries()) {
+        for (BasicBlock entry : cfg.vertices()) {
             for (Stmt stmt : entry) {
                 cost += instructionCost(stmt);
             }
+
+            cost += BASIC_BLOCK_COST;
         }
+
+        return cost;
+    }
+
+    private static int calculateCost(ControlFlowGraph cfg, LocalVariableAnalyzer analyzer) {
+        ReachabilityAnalysis reachabilityAnalysis = new ReachabilityAnalysis(cfg, analyzer);
+
+        var cost = 0;
+
+        for (BasicBlock entry : cfg.vertices()) {
+            if (!reachabilityAnalysis.isReachable(entry))
+                continue;
+
+            for (Stmt stmt : entry) {
+                cost += instructionCost(stmt);
+            }
+
+            cost += BASIC_BLOCK_COST;
+        }
+
+        return cost;
+    }
+
+    /**
+     * @param cfg         The method that is inlined <i>into</i>
+     * @param targetCfg   The method that <i>is</i> inlined
+     * @param invokeCount How often was the method invoked within cfg?
+     */
+    public boolean shouldInline(ControlFlowGraph cfg, ControlFlowGraph targetCfg, LocalVariableAnalyzer analyzer, int invokeCount) {
+        if (cfg.size() > 150 && targetCfg.size() > 1) {
+            return false;
+        }
+
+        var liftableRings = findLiftableRings(cfg, false);
+
+        for (Map.Entry<LocalRingAnalyzer.LocalVariableRing, LiftabilityResult> liftableRing : liftableRings.entrySet()) {
+            if (liftableRing.getValue().methodsRequiringInliningAndCosts.containsKey(targetCfg.getCompilerMethod())
+                    && liftableRing.getValue().cost < OUTSOURCE_BOUNTY) {
+                return true;
+            }
+        }
+
+        var analysisInfo = retrieveAnalysisInfo(targetCfg.getCompilerMethod());
+
+        var specialCost = calculateSpecialInlineCost(calculateCost(targetCfg, analyzer));
+
+        System.out.println(targetCfg.getCompilerMethod().getIdentifier() + " A: " + analysisInfo.getGeneralInlineCost(invokeCount, specialCost) + "/" + analysisInfo.specialInlineCost);
+
+        return analysisInfo.getGeneralInlineCost(invokeCount, specialCost) < GENERAL_INLINE_DISCOUNT;
+    }
+
+    private MethodAnalysisInfo analyzeMethod(ControlFlowGraph cfg) {
+        this.methodsAnalyzing.add(cfg.getCompilerMethod());
+
+        int cost = calculateCost(cfg);
 
         LiftabilityResult[] liftabilityResults;
 
@@ -176,9 +253,7 @@ public class InliningHeuristic {
                 nEdges += 1;
         }
 
-        int specialInlineCost = Math.max(cost - SPECIAL_INLINE_DISCOUNT, -1);
-
-        return new MethodAnalysisInfo(liftabilityResults, Math.max(0, specialInlineCost * (nEdges - 1)), specialInlineCost);
+        return new MethodAnalysisInfo(liftabilityResults, nEdges, calculateSpecialInlineCost(cost));
     }
 
     private LiftabilityResult[] getParamLiftCosts(ControlFlowGraph cfg) {
@@ -383,9 +458,15 @@ public class InliningHeuristic {
      */
     private record MethodAnalysisInfo(
             LiftabilityResult[] paramLiftabilityResults,
-            int generalInlineCost,
+            int nEdges,
             int specialInlineCost
     ) {
+        public int getGeneralInlineCost(int additionalInvokes) {
+            return this.getGeneralInlineCost(additionalInvokes, this.specialInlineCost);
+        }
 
+        public int getGeneralInlineCost(int additionalInvokes, int specialCost) {
+            return Math.max(0, specialCost * (this.nEdges + additionalInvokes - 2));
+        }
     }
 }

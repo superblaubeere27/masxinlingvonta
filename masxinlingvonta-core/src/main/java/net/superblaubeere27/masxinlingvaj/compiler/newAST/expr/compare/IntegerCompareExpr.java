@@ -9,6 +9,7 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.TabbedStringWrit
 import org.bytedeco.llvm.LLVM.LLVMValueRef;
 import org.bytedeco.llvm.global.LLVM;
 
+import java.util.Arrays;
 import java.util.Collections;
 
 public class IntegerCompareExpr extends Expr {
@@ -55,6 +56,18 @@ public class IntegerCompareExpr extends Expr {
         }
     }
 
+    public Operator getOperator() {
+        return operator;
+    }
+
+    public Expr getLhs() {
+        return lhs;
+    }
+
+    public Expr getRhs() {
+        return rhs;
+    }
+
     @Override
     public ImmType getType() {
         return ImmType.BOOL;
@@ -99,6 +112,10 @@ public class IntegerCompareExpr extends Expr {
 
         public int getLlvmOpcode() {
             return llvmOpcode;
+        }
+
+        public static Operator getByName(String name) {
+            return Arrays.stream(values()).filter(x -> x.operatorName.equals(name)).findFirst().orElseThrow(() -> new IllegalArgumentException("Invalid fcmp opcode " + name));
         }
     }
 }

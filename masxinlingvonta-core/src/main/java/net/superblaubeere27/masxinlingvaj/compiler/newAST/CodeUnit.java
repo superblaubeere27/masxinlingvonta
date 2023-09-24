@@ -2,6 +2,7 @@ package net.superblaubeere27.masxinlingvaj.compiler.newAST;
 
 import net.superblaubeere27.masxinlingvaj.compiler.graph.FastGraphVertex;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.PhiExpr;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.VarExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.TabbedStringWriter;
 
 import java.util.ArrayList;
@@ -77,12 +78,20 @@ public abstract class CodeUnit implements FastGraphVertex, Opcode {
 
         if (s != null) {
             s.setParent(phi);
+
+            if (phi.getBlock() != null && s instanceof VarExpr varExpr) {
+                phi.getBlock().getGraph().getLocals().uses.getNonNull(varExpr.getLocal()).add(varExpr);
+            }
         }
     }
 
     public static void unlinkPhi(PhiExpr phi, Expr s) {
         if (s != null) {
             s.setParent(null);
+
+            if (phi.getBlock() != null && s instanceof VarExpr varExpr) {
+                phi.getBlock().getGraph().getLocals().uses.getNonNull(varExpr.getLocal()).remove(varExpr);
+            }
         }
     }
 
@@ -187,7 +196,7 @@ public abstract class CodeUnit implements FastGraphVertex, Opcode {
     protected void expand() {
         if (children.length >= Integer.MAX_VALUE)
             throw new UnsupportedOperationException();
-        long len = children.length * 2;
+        long len = children.length * 2L;
         if (len > Integer.MAX_VALUE)
             len = Integer.MAX_VALUE;
         Expr[] newArray = new Expr[(int) len];
@@ -262,6 +271,15 @@ public abstract class CodeUnit implements FastGraphVertex, Opcode {
         }
         onChildUpdated(index);
         return prev;
+    }
+
+    /**
+     * Don't use if this code unit belongs to a cfg. If it does use {@link ControlFlowGraph#writeAt(FastGraphVertex, FastGraphVertex)}
+     *
+     * @throws IllegalStateException if there is a cfg
+     */
+    public Expr replaceExpr(Expr from, Expr to) {
+        return this.writeAt(to, this.indexOf(from));
     }
 
     public void deleteAt(int _ptr) {

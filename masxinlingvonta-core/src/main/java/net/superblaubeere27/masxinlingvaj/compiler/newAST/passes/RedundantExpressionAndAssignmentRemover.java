@@ -1,17 +1,17 @@
 package net.superblaubeere27.masxinlingvaj.compiler.newAST.passes;
 
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.*;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.PhiExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.VarExpr;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.properties.ExprProperty;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.ExpressionStmt;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.properties.InstProperty;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.copy.AbstractCopyStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.copy.CopyPhiStmt;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.copy.CopyVarStmt;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.jvm.DeleteRefStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.StatementTransaction;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
 
 public class RedundantExpressionAndAssignmentRemover extends Pass {
 
@@ -30,7 +30,7 @@ public class RedundantExpressionAndAssignmentRemover extends Pass {
     }
 
     private static void extractNonRedundantExpressions0(Expr expr, List<Expr> exprList) {
-        if (expr.getMetadata().getProperties().stream().anyMatch(ExprProperty::changesState)) {
+        if (hasSideEffects(expr)) {
             exprList.add(expr);
             return;
         }
@@ -38,6 +38,10 @@ public class RedundantExpressionAndAssignmentRemover extends Pass {
         for (Expr child : expr.getChildren()) {
             extractNonRedundantExpressions0(child, exprList);
         }
+    }
+
+    public static boolean hasSideEffects(Expr expr) {
+        return expr.getMetadata().getProperties().stream().anyMatch(InstProperty::changesState);
     }
 
     @Override
@@ -74,6 +78,12 @@ public class RedundantExpressionAndAssignmentRemover extends Pass {
 
             for (BasicBlock vertex : cfg.vertices()) {
                 for (Stmt stmt : vertex) {
+                    if (isRedundant(stmt)) {
+                        transaction.removeStatementAndExtractSideEffects(stmt);
+
+                        continue;
+                    }
+
                     if (!(stmt instanceof AbstractCopyStmt))
                         continue;
 
@@ -81,11 +91,15 @@ public class RedundantExpressionAndAssignmentRemover extends Pass {
                         continue;
                     }
 
-                    transaction.replaceStatement(stmt, extractNonRedundantExpressions(stmt).stream().map(x -> new ExpressionStmt(x.copy())).collect(Collectors.toList()));
+                    transaction.removeStatementAndExtractSideEffects(stmt);
                 }
             }
 
         } while (transaction.apply());
+    }
+
+    private boolean isRedundant(Stmt stmt) {
+        return stmt instanceof DeleteRefStmt deleteRefStmt && deleteRefStmt.getObject().getOpcode() == Opcode.CONST_NULL;
     }
 
 }

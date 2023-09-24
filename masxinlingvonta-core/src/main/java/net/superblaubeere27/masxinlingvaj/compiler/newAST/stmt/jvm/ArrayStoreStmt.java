@@ -7,9 +7,6 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.Expr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.ImmToLLVMIRCompiler;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.Stmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.TabbedStringWriter;
-import net.superblaubeere27.masxinlingvaj.utils.LLVMIntrinsic;
-import net.superblaubeere27.masxinlingvaj.utils.LLVMUtils;
-import org.bytedeco.llvm.global.LLVM;
 
 public class ArrayStoreStmt extends Stmt {
     private final JNIType type;
@@ -69,7 +66,7 @@ public class ArrayStoreStmt extends Stmt {
 
         this.element.toString(writer);
 
-        writer.print(" (" + this.type.getDisplayName() + "[]);");
+        writer.print(" (" + this.type.getDisplayName() + ");");
     }
 
     @Override
@@ -79,11 +76,9 @@ public class ArrayStoreStmt extends Stmt {
 
     @Override
     public boolean equivalent(CodeUnit s) {
-        if (!(s instanceof ArrayStoreStmt)) {
+        if (!(s instanceof ArrayStoreStmt other)) {
             return false;
         }
-
-        var other = ((ArrayStoreStmt) s);
 
         return other.array.equivalent(this.array) && other.element.equivalent(this.element) && other.index.equivalent(this.index);
     }

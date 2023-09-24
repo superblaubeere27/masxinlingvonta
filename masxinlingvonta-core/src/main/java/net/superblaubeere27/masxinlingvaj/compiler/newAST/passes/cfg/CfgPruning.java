@@ -1,9 +1,15 @@
-package net.superblaubeere27.masxinlingvaj.compiler.newAST.passes;
+package net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.cfg;
 
 import net.superblaubeere27.masxinlingvaj.compiler.MLVCompiler;
 import net.superblaubeere27.masxinlingvaj.compiler.graph.FlowEdge;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.*;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.BasicBlock;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.ControlFlowGraph;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.Opcode;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.Stmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.PhiExpr;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.VarExpr;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.InlineLocalPass;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.Pass;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches.ExceptionCheckStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches.UnconditionalBranch;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.copy.CopyPhiStmt;
@@ -12,7 +18,14 @@ import net.superblaubeere27.masxinlingvaj.utils.CustomEquivalenceMap;
 import java.util.*;
 import java.util.stream.Stream;
 
-public class CallGraphPruningPass extends Pass {
+public class CfgPruning extends Pass {
+
+    private final MLVCompiler compiler;
+
+    public CfgPruning(MLVCompiler compiler) {
+        this.compiler = compiler;
+    }
+
 
     private static boolean isUsedByPhi(BasicBlock block) {
         return block.getGraph().getSuccessors(block).anyMatch(successor -> {
@@ -31,16 +44,26 @@ public class CallGraphPruningPass extends Pass {
 
     @Override
     public void apply(ControlFlowGraph cfg) {
+        CfgWalking cfgWalking = new CfgWalking(this.compiler);
+
         boolean changed;
 
         do {
             changed = replaceDuplicates(cfg);
-//
+            cfg.verify();
+
             changed |= mergeBlocks(cfg);
+            cfg.verify();
+
+            changed |= cfgWalking.apply(cfg);
+
+            cfg.verify();
         } while (changed);
     }
 
     private boolean mergeBlocks(ControlFlowGraph cfg) {
+        InlineLocalPass.simplifyPhis(cfg);
+
         var prependedBlocks = new HashMap<BasicBlock, BasicBlock>();
 
         var alreadyAffected = new HashSet<BasicBlock>();
@@ -67,6 +90,10 @@ public class CallGraphPruningPass extends Pass {
 
             // Blocks made out of single branches can always be forwarded
             if ((vertex.size() != 1 || vertex.getTerminator().getOpcode() != Opcode.UNCONDITIONAL_BRANCH) && cfg.getReverseEdges(nextBlock).size() != 1)
+                continue;
+
+            // Check if any of the phi statements of the following blocks contain variables from the current block, should have been fixed by InlineLocalPass.simplifyPhis
+            if (nextBlock.stream().anyMatch(x -> x instanceof CopyPhiStmt copyPhi && copyPhi.getExpression().getArguments().values().stream().anyMatch(y -> y instanceof VarExpr varExpr && cfg.getLocals().defs.get(varExpr.getLocal()).getBlock().equals(vertex))))
                 continue;
 
             // Forward phi values
