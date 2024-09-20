@@ -3,13 +3,32 @@ package net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.Assumption;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.relations.LinkedAssumptions;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
 public class AssumptionAnalyzer {
+
+    /**
+     * Remaps the given assumption by function fun. i.e. y=(Box(x >= 5) AND NOT-NULL) AND y=Box(x < 1000), this function
+     * could extract the box and turn the assumption into: x >= 5 AND x < 1000.
+     *
+     * @param fun Remapping function. May return null or NO_ASSUMPTION if the assumption cannot be remapped.
+     */
+    public static Assumption remapAssumption(Assumption assumption, Function<Assumption, Assumption> fun) {
+        if (assumption instanceof LinkedAssumptions linkedAssumption) {
+            var assumptions = linkedAssumption.getAssumptionList().stream().map(fun).filter(Objects::nonNull).toArray(Assumption[]::new);
+
+            return switch (linkedAssumption.getLinkType()) {
+                case AND -> LinkedAssumptions.and(assumptions);
+                case OR -> LinkedAssumptions.or(assumptions);
+            };
+        }
+
+        var remappedAssumption = fun.apply(assumption);
+
+        return remappedAssumption != null ? remappedAssumption : Assumption.NoAssumption.INSTANCE;
+    }
 
     /**
      * Tells which values an assumption could have, i.e.
@@ -30,13 +49,13 @@ public class AssumptionAnalyzer {
         }
     }
 
-    public static <T> boolean extractPossibleValues0(Assumption assumption, Function<Assumption, Optional<T>> leafPredicate, HashSet<T> possibleValues) {
+    private static <T> boolean extractPossibleValues0(Assumption assumption, Function<Assumption, Optional<T>> leafPredicate, HashSet<T> possibleValues) {
         if (assumption instanceof LinkedAssumptions linkedAssumption) {
             // It might seem paradox that AND is handled by or assumption and vice-versa.
             // But since the AND-link means that all assumptions apply at the same time.
             return switch (linkedAssumption.getLinkType()) {
-                case AND -> orValues(linkedAssumption.getAssumptionList(), leafPredicate, possibleValues);
-                case OR -> andValues(linkedAssumption.getAssumptionList(), leafPredicate, possibleValues);
+                case AND -> orPossibleValues(linkedAssumption.getAssumptionList(), leafPredicate, possibleValues);
+                case OR -> andPossibleValues(linkedAssumption.getAssumptionList(), leafPredicate, possibleValues);
             };
         }
 
@@ -49,6 +68,57 @@ public class AssumptionAnalyzer {
         possibleValues.add(leafValue.get());
 
         return true;
+    }
+
+    /**
+     * Tells which values an assumption <b>actually</b> has. This is different from {@link #extractPossibleValues(Assumption, Function)}
+     * since this function will return the actual values of the assumption, i.e.
+     * <ul>
+     *     <li>y in [5, 2, 4] OR ((y in [1, 3] OR y=9) AND x=true), here the function would return None as values for y</li>
+     *     <li>y in [5, 2, 4] OR (y in [2, 4] AND x=true), here the function would return Some([2, 4]) as values for y</li>
+     * </ul>
+     */
+    public static <T> HashSet<T> extractActualValues(Assumption assumption, Function<Assumption, Set<T>> leafPredicate) {
+        if (assumption instanceof LinkedAssumptions linkedAssumptions) {
+            return switch (linkedAssumptions.getLinkType()) {
+                case AND -> orValues(linkedAssumptions.getAssumptionList(), leafPredicate);
+                case OR -> andValues(linkedAssumptions.getAssumptionList(), leafPredicate);
+            };
+        }
+
+        return new HashSet<>(leafPredicate.apply(assumption));
+    }
+
+    private static <T> HashSet<T> andValues(List<Assumption> assumptionList, Function<Assumption, Set<T>> leafPredicate) {
+        HashSet<T> values = null;
+
+        for (Assumption assumption : assumptionList) {
+            var extractedValues = extractActualValues(assumption, leafPredicate);
+
+            if (values != null) {
+                values.retainAll(extractedValues);
+            } else {
+                values = extractedValues;
+            }
+        }
+
+        return values == null ? new HashSet<>() : values;
+    }
+
+    private static <T> HashSet<T> orValues(List<Assumption> assumptionList, Function<Assumption, Set<T>> leafPredicate) {
+        HashSet<T> values = null;
+
+        for (Assumption assumption : assumptionList) {
+            var extractedValues = extractActualValues(assumption, leafPredicate);
+
+            if (values != null) {
+                values.addAll(extractedValues);
+            } else {
+                values = extractedValues;
+            }
+        }
+
+        return values == null ? new HashSet<>() : values;
     }
 
     public static <T> Optional<T> extractValue(Assumption assumption, Function<Assumption, Optional<T>> leafPredicate) {
@@ -81,19 +151,24 @@ public class AssumptionAnalyzer {
      * If all leaf predicates yield the same value, this function will return this value.
      */
     private static <T> Optional<T> andValue(List<Assumption> assumptionList, Function<Assumption, Optional<T>> leafPredicate) {
+        boolean first = true;
         Optional<T> currentValue = Optional.empty();
 
         for (Assumption assumption : assumptionList) {
             var extractedValue = extractValue(assumption, leafPredicate);
 
-            if (currentValue.isEmpty()) {
+            if (extractedValue.isEmpty())
+                return Optional.empty();
+
+            if (first) {
                 currentValue = extractedValue;
+                first = false;
 
                 continue;
             }
 
             // This assumption yields either no or a different value, so no assumption can be made of the value
-            if (extractedValue.isEmpty() || !extractedValue.get().equals(currentValue.get()))
+            if (!extractedValue.get().equals(currentValue.get()))
                 return Optional.empty();
         }
 
@@ -103,7 +178,7 @@ public class AssumptionAnalyzer {
     /**
      * If all leaf predicates yield the same value, this function will return this value.
      */
-    private static <T> boolean andValues(List<Assumption> assumptionList, Function<Assumption, Optional<T>> leafPredicate, HashSet<T> values) {
+    private static <T> boolean andPossibleValues(List<Assumption> assumptionList, Function<Assumption, Optional<T>> leafPredicate, HashSet<T> values) {
         if (assumptionList.isEmpty())
             return false;
 
@@ -124,7 +199,7 @@ public class AssumptionAnalyzer {
         return assumptionList.stream().map(x -> extractValue(x, leafPredicate)).filter(Optional::isPresent).findFirst().orElse(Optional.empty());
     }
 
-    private static <T> boolean orValues(List<Assumption> assumptionList, Function<Assumption, Optional<T>> leafPredicate, HashSet<T> values) {
+    private static <T> boolean orPossibleValues(List<Assumption> assumptionList, Function<Assumption, Optional<T>> leafPredicate, HashSet<T> values) {
         // For a (valid) AND assumption it is enough to find exactly one child that yields discrete values.
         // This is because every child applies at the same time and different child cannot contradict.
         // i.e. (y=5 OR x=false) AND (y=5 OR y=4) -> [5,4]

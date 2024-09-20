@@ -28,7 +28,7 @@ public class Heap2RegPass extends Pass {
      * <p>
      * A ring can be lifted if:
      * <ol>
-     *     <li>All instructions acting on it are viable (see {@link Heap2RegPass#isViableUsage(CodeUnit)})</li>
+     *     <li>All instructions acting on it are viable (see {@link Heap2RegPass#isViableUsage(CodeUnit, LocalRingAnalyzer.LocalVariableRing)})</li>
      *     <li>All instructions providing an instance to the ring allocate the object</li>
      *     <li>There is a definite class type (i.e. if a ring can contain <code>class A extends C</code> or
      *     <code>class B extends C</code> then it is not possible to lift it (yet...))</li>
@@ -77,8 +77,13 @@ public class Heap2RegPass extends Pass {
 
         if (parent instanceof GetFieldExpr getField && getField.getInstance() instanceof VarExpr varExpr && ringVars.contains(varExpr.getLocal()))
             return true;
-        if (parent instanceof PutFieldStmt getField && getField.getInstance() instanceof VarExpr varExpr && ringVars.contains(varExpr.getLocal()))
-            return true;
+        if (parent instanceof PutFieldStmt getField && getField.getInstance() instanceof VarExpr varExpr && ringVars.contains(varExpr.getLocal())) {
+            // Check if the value is a self-reference. We cannot lift self-referencing objects into registers since we
+            // would need to have an object reference.
+            var isSelfReferential = getField.getValue() instanceof VarExpr setValue && ringVars.contains(setValue.getLocal());
+
+            return !isSelfReferential;
+        }
 
         return parent instanceof PhiExpr;
     }

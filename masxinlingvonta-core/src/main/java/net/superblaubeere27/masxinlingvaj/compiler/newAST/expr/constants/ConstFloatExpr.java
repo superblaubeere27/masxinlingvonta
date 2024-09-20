@@ -51,6 +51,10 @@ public class ConstFloatExpr extends ConstExpr {
         return ImmType.FLOAT;
     }
 
+    public float getValue() {
+        return value;
+    }
+
     @Override
     public ExprMetadata getMetadata() {
         return new ExprMetadata(ExprMetadata.ExprClass.FIRST, Collections.emptyList());

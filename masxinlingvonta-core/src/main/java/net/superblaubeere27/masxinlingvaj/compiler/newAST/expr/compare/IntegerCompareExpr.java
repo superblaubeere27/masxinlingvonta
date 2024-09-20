@@ -117,5 +117,16 @@ public class IntegerCompareExpr extends Expr {
         public static Operator getByName(String name) {
             return Arrays.stream(values()).filter(x -> x.operatorName.equals(name)).findFirst().orElseThrow(() -> new IllegalArgumentException("Invalid fcmp opcode " + name));
         }
+
+        public boolean apply(long value, long rhs) {
+            return switch (this) {
+                case EQUAL -> value == rhs;
+                case NOT_EQUAL -> value != rhs;
+                case LOWER -> value < rhs;
+                case LOWER_EQUAL -> value <= rhs;
+                case GREATER -> value > rhs;
+                case GREATER_EQUAL -> value >= rhs;
+            };
+        }
     }
 }

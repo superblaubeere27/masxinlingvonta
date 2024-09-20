@@ -16,14 +16,18 @@ import org.bytedeco.llvm.LLVM.LLVMPassManagerRef;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.net.URL;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executors;
+import java.util.logging.Logger;
 
 import static org.bytedeco.llvm.global.LLVM.*;
 
 public class MLV {
+    public static final Logger LOG = Logger.getLogger("MLV");
+
     private static final ExecutorServiceFactory EXECUTOR_SERVICE_FACTORY = () -> Executors.newFixedThreadPool(12);
 
     private final CompilerPreprocessor preprocessor;
@@ -44,13 +48,19 @@ public class MLV {
     }
 
     public void preprocessAndCompile(OptimizerSettings optimizerSettings) throws Exception {
-        this.compiler = new MLVCompiler(this.input.getClassNodes(), this.libraries.getClassNodes(), optimizerSettings);
-
-        preprocessor.preprocess(compiler);
+        preprocess(optimizerSettings);
 
         compiler.compile(preprocessor);
 
         new CompilerPostprocessor().postprocess(this.compiler);
+    }
+
+    public void preprocess(OptimizerSettings optimizerSettings) throws Exception {
+        this.compiler = new MLVCompiler(this.input.getClassNodes(), this.libraries.getClassNodes(), optimizerSettings);
+
+        preprocessor.preprocess(compiler);
+
+        this.compiler.buildTrees();
     }
 
     public void writeOutput(File file) throws IOException {
@@ -79,6 +89,14 @@ public class MLV {
         LLVMRunPassManager(pass, module);
 
         LLVMDisposePassManager(pass);
+    }
+
+    public void dumpClassCfg(List<String> classNames, PrintStream outs) {
+        this.compiler.dumpClassCfg(classNames, outs);
+    }
+
+    public MLVCompiler getCompiler() {
+        return compiler;
     }
 
     public LLVMModuleRef getLLVMModule() {

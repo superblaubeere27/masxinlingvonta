@@ -93,7 +93,7 @@ public final class ObjectLocalInfo extends Assumption {
                 }
 
                 // If the outer assumption already contained this assumption, this assumption is useless.
-                if (otherInfo.relation() == info.relation()) {
+                if (otherInfo.relation() == info.relation() && otherInfo.type().equals(info.type()) && otherInfo.inverted() == info.inverted()) {
                     continue Outer;
                 }
             }

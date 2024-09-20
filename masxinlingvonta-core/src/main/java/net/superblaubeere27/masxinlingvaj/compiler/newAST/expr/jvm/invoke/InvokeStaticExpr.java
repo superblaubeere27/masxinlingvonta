@@ -7,10 +7,6 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.CodeUnit;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.Expr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.ImmType;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.codegen.FunctionCodegenContext;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.ExprMetadata;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.properties.ReadsMemoryProperty;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.properties.ThrowsProperty;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.properties.WritesMemoryProperty;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.TabbedStringWriter;
 import net.superblaubeere27.masxinlingvaj.compiler.tree.MethodOrFieldIdentifier;
 import org.bytedeco.javacpp.PointerPointer;
@@ -65,11 +61,6 @@ public class InvokeStaticExpr extends InvokeExpr {
     @Override
     public ImmType getType() {
         return ImmType.fromJVMType(returnType);
-    }
-
-    @Override
-    public ExprMetadata getMetadata() {
-        return new ExprMetadata(ExprMetadata.ExprClass.SECOND, Arrays.asList(ReadsMemoryProperty.INSTANCE, WritesMemoryProperty.INSTANCE, ThrowsProperty.INSTANCE));
     }
 
     @Override

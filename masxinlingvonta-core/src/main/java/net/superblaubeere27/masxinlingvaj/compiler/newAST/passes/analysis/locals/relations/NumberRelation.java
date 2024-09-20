@@ -20,6 +20,15 @@ public class NumberRelation<N extends Number> extends Assumption {
         return other instanceof NumberRelation<?> numberRelation && this.rhs.equals(numberRelation.rhs) && this.operator == numberRelation.operator;
     }
 
+
+    public IntegerCompareExpr.Operator getOperator() {
+        return operator;
+    }
+
+    public RelationObject<N> getRhs() {
+        return rhs;
+    }
+
     @Override
     public String toString() {
         return this.operator + " " + this.rhs.toString();

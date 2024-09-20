@@ -18,6 +18,8 @@ public class CompilerClass {
     private final boolean isLibrary;
     private boolean modifiedFlag;
 
+    private ClassVTable vTable;
+
     private ClassRelations relations;
 
     public CompilerClass(ClassNode classNode, boolean isLibrary) {
@@ -99,5 +101,13 @@ public class CompilerClass {
 
     public boolean isInterface() {
         return (this.classNode.access & Opcodes.ACC_INTERFACE) != 0;
+    }
+
+    public ClassVTable getvTable() {
+        return vTable;
+    }
+
+    public void setvTable(ClassVTable vTable) {
+        this.vTable = vTable;
     }
 }

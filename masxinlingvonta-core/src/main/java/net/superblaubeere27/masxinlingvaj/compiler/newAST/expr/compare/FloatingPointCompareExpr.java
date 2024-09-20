@@ -73,6 +73,18 @@ public class FloatingPointCompareExpr extends Expr {
         return ImmType.BOOL;
     }
 
+    public Expr getRhs() {
+        return rhs;
+    }
+
+    public Expr getLhs() {
+        return lhs;
+    }
+
+    public Operator getOperator() {
+        return operator;
+    }
+
     @Override
     public ExprMetadata getMetadata() {
         return new ExprMetadata(ExprMetadata.ExprClass.SECOND, Collections.emptyList());

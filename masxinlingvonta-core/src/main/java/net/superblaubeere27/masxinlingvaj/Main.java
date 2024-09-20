@@ -11,6 +11,7 @@ import org.objectweb.asm.Opcodes;
 
 import java.io.File;
 import java.net.MalformedURLException;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -43,6 +44,8 @@ public class Main {
     };
 
     public static void main(String[] args) throws Exception {
+        var okLines = Files.readAllLines(new File("compiled-test-names.txt").toPath());
+
         var mlv = new MLV(new CompilerPreprocessor(
                 new AbstractPreprocessor() {
                     @Override
@@ -51,8 +54,15 @@ public class Main {
                             if (aClass.isLibrary())
                                 continue;
 
-//                            if (!aClass.getClassNode().name.startsWith("net/ccbluex/liquidbounce/"))
-//                                continue;
+                            if (!RUN_TESTS && aClass.getClassNode().name.startsWith("compiler/escapeAnalysis/cr"))
+                                continue;
+                            if (!RUN_TESTS) {
+                                // Get the class name without the package
+                                var className = aClass.getClassNode().name.substring(aClass.getClassNode().name.lastIndexOf("/") + 1);
+
+                                if (!okLines.contains(className))
+                                    continue;
+                            }
                             if ((aClass.getClassNode().access & Opcodes.ACC_INTERFACE) != 0)
                                 continue;
 //                            if (RUN_TESTS && !aClass.getClassNode().name.equals("Test") && !aClass.getClassNode().name.startsWith("Test$"))
@@ -65,9 +75,9 @@ public class Main {
                                     continue;
                                 if (method.getNode().name.startsWith("<")
                                         || method.getIdentifier().getName().equals("main")
+//                                        || !RUN_TESTS && !method.getIdentifier().getName().equals("func_1")
 //                                        || RUN_TESTS && !method.getNode().name.startsWith("setup")
                                         || RUN_TESTS && !method.getNode().name.startsWith("test")
-                                        || !RUN_TESTS && !(method.getIdentifier().toString().startsWith("APathfinding") || method.getIdentifier().toString().startsWith("Frame"))
 //                                        || !method.getParent().getName().equals("Test$Vec3") || !method.getNode().name.equals("absSquared")
                                 )
                                     continue;
@@ -87,7 +97,7 @@ public class Main {
         ));
 
         if (!RUN_TESTS) {
-            mlv.loadInput(new File("testJars/APathfinding-Visual.jar"));
+            mlv.loadInput(new File("D:\\Projects\\IntelliJ\\mlv-test-generator\\cc\\cc.jar"));
         } else {
             mlv.loadInput(new File("testJars/Test.jar"));
         }
@@ -104,7 +114,7 @@ public class Main {
         mlv.preprocessAndCompile(new OptimizerSettings(true));
 
         if (!RUN_TESTS) {
-            mlv.writeOutput(new File("testJars/APathfinding-Visual-obf.jar"));
+            mlv.writeOutput(new File("D:\\Projects\\IntelliJ\\mlv-test-generator\\cc\\cc-obf.jar"));
         } else {
             mlv.writeOutput(new File("testJars/Test-obf.jar"));
         }

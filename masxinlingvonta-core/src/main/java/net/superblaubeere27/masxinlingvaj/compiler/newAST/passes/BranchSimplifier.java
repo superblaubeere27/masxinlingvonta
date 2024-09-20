@@ -18,6 +18,7 @@ import java.util.Optional;
 
 public class BranchSimplifier {
 
+
     public static void trySimplifyBranch(ExpressionSimplifier simplifier, LocalVariableAnalyzer analyzer, StatementTransaction transaction, BranchStmt branch) {
         var actualTargetIndex = getBranchTargetIndexIfKnown(simplifier, branch, analyzer.getStatementSnapshot(branch), false);
 

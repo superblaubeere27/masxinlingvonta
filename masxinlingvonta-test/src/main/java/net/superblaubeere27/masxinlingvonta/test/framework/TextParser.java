@@ -29,8 +29,7 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches.Uncondit
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.copy.CopyPhiStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.copy.CopyVarStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.jvm.*;
-import net.superblaubeere27.masxinlingvaj.compiler.tree.CompilerClass;
-import net.superblaubeere27.masxinlingvaj.compiler.tree.CompilerMethod;
+import net.superblaubeere27.masxinlingvaj.compiler.tree.CompilerIndex;
 import net.superblaubeere27.masxinlingvaj.compiler.tree.MethodOrFieldIdentifier;
 import net.superblaubeere27.masxinlingvonta.test.framework.antlr4.mlvirBaseVisitor;
 import net.superblaubeere27.masxinlingvonta.test.framework.antlr4.mlvirParser;
@@ -42,20 +41,21 @@ import org.objectweb.asm.tree.MethodNode;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static net.superblaubeere27.masxinlingvaj.utils.TypeUtils.getEffectiveArgumentTypes;
 
 public class TextParser extends mlvirBaseVisitor<Object> {
     private final mlvirParser parser;
-    private final CompilerClass compilerClass;
+    private final CompilerIndex index;
     ControlFlowGraph cfg;
     private HashMap<String, Local> localMap;
     private HashMap<String, BasicBlock> blockMap;
 
-    public TextParser(mlvirParser parser, CompilerClass compilerClass) {
+    public TextParser(mlvirParser parser, CompilerIndex index) {
         this.parser = parser;
-        this.compilerClass = compilerClass;
+        this.index = index;
     }
 
     private static FloatingPointArithmeticsExpr.Operator getFPArithmeticsOpcode(String operator) {
@@ -124,7 +124,7 @@ public class TextParser extends mlvirBaseVisitor<Object> {
         mn.name = ctx.methodName().getText();
         mn.desc = ctx.methodType().getText();
 
-        var compilerMethod = new CompilerMethod(this.compilerClass, mn);
+        var compilerMethod = Objects.requireNonNull(this.index.getMethod(cn.name, mn.name, mn.desc));
 
         this.blockMap = new HashMap<>();
         this.localMap = new HashMap<>();

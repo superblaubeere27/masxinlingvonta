@@ -1,12 +1,10 @@
 package net.superblaubeere27.masxinlingvonta.test.framework;
 
-import net.superblaubeere27.masxinlingvaj.compiler.tree.CompilerClass;
 import net.superblaubeere27.masxinlingvonta.test.framework.antlr4.mlvirLexer;
 import net.superblaubeere27.masxinlingvonta.test.framework.antlr4.mlvirParser;
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.ATNConfigSet;
 import org.antlr.v4.runtime.dfa.DFA;
-import org.objectweb.asm.tree.ClassNode;
 
 import java.io.IOException;
 import java.util.BitSet;
@@ -48,17 +46,17 @@ public class FrameworkTest {
             }
         });
 
-        TextParser textParser = new TextParser(parser, new CompilerClass(new ClassNode(), false));
-
-        try {
-            textParser.visitFile(parser.file());
-        } catch (RecognitionException e) {
-            parser.notifyErrorListeners(e.getOffendingToken(), e.getMessage(), e);
-
-            throw e;
-        }
-
-        System.out.println(textParser.cfg);
+//        TextParser textParser = new TextParser(parser, new CompilerClass(new ClassNode(), false));
+//
+//        try {
+//            textParser.visitFile(parser.file());
+//        } catch (RecognitionException e) {
+//            parser.notifyErrorListeners(e.getOffendingToken(), e.getMessage(), e);
+//
+//            throw e;
+//        }
+//
+//        System.out.println(textParser.cfg);
     }
 
 }

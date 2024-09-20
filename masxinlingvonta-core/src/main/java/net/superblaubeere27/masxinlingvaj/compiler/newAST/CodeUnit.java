@@ -274,7 +274,7 @@ public abstract class CodeUnit implements FastGraphVertex, Opcode {
     }
 
     /**
-     * Don't use if this code unit belongs to a cfg. If it does use {@link ControlFlowGraph#writeAt(FastGraphVertex, FastGraphVertex)}
+     * Don't use if this code unit belongs to a cfg. If it does use {@link ControlFlowGraph#writeAt(CodeUnit, Expr, Expr)}
      *
      * @throws IllegalStateException if there is a cfg
      */

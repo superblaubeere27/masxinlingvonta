@@ -5,8 +5,8 @@ import net.superblaubeere27.masxinlingvaj.compiler.graph.FlowEdge;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.BasicBlock;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.Expr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.Stmt;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.RedundantExpressionAndAssignmentRemover;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.ReachabilityAnalysis;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.instSimplify.deadCode.DeadCodeRemover;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.ExpressionStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches.BranchStmt;
 
@@ -16,6 +16,9 @@ import java.util.*;
 public class StatementTransaction {
     private final HashMap<Expr, Expr> exprReplacements = new HashMap<>();
     private final HashMap<Stmt, List<Stmt>> replacements = new HashMap<>();
+    /**
+     * Blocks that should be removed if they become unreferenced.
+     */
     private final HashSet<BasicBlock> removedBlocks = new HashSet<>();
 
     public void replaceStatement(Stmt stmt, List<Stmt> replacements) {
@@ -28,20 +31,31 @@ public class StatementTransaction {
      * Removes blocks and their edges. If blocks become unreachable, remove their children too.
      *
      * @param removedBlocks must contain elements
+     * @return true if any changes where made
      */
-    private static void applyBlockRemovals(HashSet<BasicBlock> removedBlocks) {
+    private static boolean applyBlockRemovals(HashSet<BasicBlock> removedBlocks) {
         var blockRemovalQueue = new ArrayDeque<>(removedBlocks);
-        var reachabilityAnalysis = new ReachabilityAnalysis(blockRemovalQueue.peekFirst().cfg);
+        var cfg = blockRemovalQueue.peekFirst().cfg;
+        var reachabilityAnalysis = new ReachabilityAnalysis(cfg);
+
+        var changed = false;
 
         while (!blockRemovalQueue.isEmpty()) {
             var blockToRemove = blockRemovalQueue.pop();
-            var cfg = blockToRemove.getGraph();
+
+            assert blockToRemove.getGraph() == cfg;
+
+            // Don't remove reachable blocks
+            if (reachabilityAnalysis.isReachable(blockToRemove))
+                continue;
 
             // Remember outgoing edges
             var outgoingEdges = new ArrayList<>(cfg.getEdges(blockToRemove));
 
             if (blockToRemove.getGraph().containsVertex(blockToRemove)) {
                 cfg.exciseBlock(blockToRemove);
+
+                changed = true;
             }
 
             // Is any successive block left unreferenced? Then excise it too
@@ -51,6 +65,8 @@ public class StatementTransaction {
                 }
             }
         }
+
+        return changed;
     }
 
     /**
@@ -61,10 +77,6 @@ public class StatementTransaction {
         edge.dst().getGraph().exciseEdge(edge);
 
         exciseBlockIfUnreferenced(edge.dst());
-    }
-
-    private void removeBlock(BasicBlock block) {
-        this.removedBlocks.add(block);
     }
 
     public void replaceStatement(Stmt stmt, Stmt replacement) {
@@ -79,12 +91,8 @@ public class StatementTransaction {
     /**
      * Excises the block if it is currently unreferenced. If it is excised, the following edges are removed too
      */
-    private void exciseBlockIfUnreferenced(BasicBlock block) {
-        if (!block.cfg.getReverseEdges(block).isEmpty()) {
-            return;
-        }
-
-        this.removeBlock(block);
+    public void exciseBlockIfUnreferenced(BasicBlock block) {
+        this.removedBlocks.add(block);
     }
 
     public void removeStatementAndExtractSideEffects(Stmt stmt) {
@@ -92,7 +100,7 @@ public class StatementTransaction {
     }
 
     public void replaceStatementAndExtractSideEffects(Stmt stmt, @Nullable Stmt replacement) {
-        var extractedExpressions = RedundantExpressionAndAssignmentRemover.extractNonRedundantExpressions(stmt);
+        var extractedExpressions = DeadCodeRemover.extractNonRedundantExpressions(stmt);
 
         var replacements = new ArrayList<Stmt>(extractedExpressions.size() + 1);
 
@@ -125,11 +133,11 @@ public class StatementTransaction {
             from.getBlock().getGraph().writeAt(from.getParent(), from, to);
         });
 
-        if (!this.removedBlocks.isEmpty()) {
-            applyBlockRemovals(this.removedBlocks);
-        }
+        boolean changed = !replacements.isEmpty() || !this.exprReplacements.isEmpty();
 
-        boolean changed = !replacements.isEmpty() || !this.removedBlocks.isEmpty() || !this.exprReplacements.isEmpty();
+        if (!this.removedBlocks.isEmpty()) {
+            changed |= applyBlockRemovals(this.removedBlocks);
+        }
 
         this.replacements.clear();
         this.exprReplacements.clear();

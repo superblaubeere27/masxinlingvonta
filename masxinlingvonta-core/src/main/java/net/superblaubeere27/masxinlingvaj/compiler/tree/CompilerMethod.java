@@ -81,7 +81,9 @@ public class CompilerMethod {
     }
 
     public boolean canBeOutsourced() {
-        return !this.parent.isInterface() && (this.methodNode.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) == 0;
+        var hasCode = !this.parent.isInterface() && (this.methodNode.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) == 0;
+
+        return hasCode && !this.getIdentifier().getName().startsWith("mlv$");
     }
 
     public boolean isLibrary() {

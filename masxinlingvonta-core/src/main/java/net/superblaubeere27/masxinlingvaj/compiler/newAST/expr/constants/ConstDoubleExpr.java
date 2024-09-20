@@ -51,6 +51,10 @@ public class ConstDoubleExpr extends ConstExpr {
         return ImmType.DOUBLE;
     }
 
+    public double getValue() {
+        return value;
+    }
+
     @Override
     public ExprMetadata getMetadata() {
         return new ExprMetadata(ExprMetadata.ExprClass.FIRST, Collections.emptyList());

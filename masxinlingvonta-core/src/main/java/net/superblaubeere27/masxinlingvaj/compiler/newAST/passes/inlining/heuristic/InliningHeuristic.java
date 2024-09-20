@@ -16,6 +16,7 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.Reacha
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.Assumption;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.LocalVariableAnalyzer;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.ObjectLocalInfo;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.relations.LinkedAssumptions;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.inlining.heap2reg.Heap2RegPass;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.RetStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.jvm.ArrayStoreStmt;
@@ -113,9 +114,7 @@ public class InliningHeuristic {
     public static Assumption getAdditionalAssumptions(Assumption localInfo, Expr expr) {
         if (expr instanceof GetFieldExpr getFieldExpr) {
             if (referencesParam(getFieldExpr.getInstance(), false)) {
-                var info = ((ObjectLocalInfo) localInfo);
-
-                return (info == null ? ObjectLocalInfo.create() : info).assumeIsNull(false);
+                return LinkedAssumptions.and(localInfo, ObjectLocalInfo.create().assumeIsNull(false));
             }
         }
 

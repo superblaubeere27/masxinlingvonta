@@ -79,7 +79,8 @@ public class InstSimplifyPass extends Pass {
 
                     BranchSimplifier.trySimplifyBranch(this.simplifier, analyzer, transaction, (BranchStmt) stmt);
 
-                    transaction.apply();
+                    if (transaction.apply())
+                        "".length();
                 }
             }
         }

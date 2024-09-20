@@ -15,20 +15,17 @@ import java.util.stream.Collectors;
 public class InstructionExtractor extends AbstractPreprocessor implements Opcodes {
 
     private static Type[] getArgumentTypesOfInstruction(AbstractInsnNode instruction) {
-        if (instruction instanceof MultiANewArrayInsnNode) {
-            var multiANewArray = ((MultiANewArrayInsnNode) instruction);
+        if (instruction instanceof MultiANewArrayInsnNode multiANewArray) {
 
             Type[] types = new Type[multiANewArray.dims];
 
-            Arrays.fill(types, Type.getType(multiANewArray.desc).getElementType());
+            Arrays.fill(types, Type.INT_TYPE);
 
             return types;
-        } else if (instruction instanceof InvokeDynamicInsnNode) {
-            var invokeDynamic = ((InvokeDynamicInsnNode) instruction);
+        } else if (instruction instanceof InvokeDynamicInsnNode invokeDynamic) {
 
             return Type.getArgumentTypes(invokeDynamic.desc);
-        } else if (instruction instanceof MethodInsnNode) {
-            var callInstruction = ((MethodInsnNode) instruction);
+        } else if (instruction instanceof MethodInsnNode callInstruction) {
 
             var argumentTypes = Type.getArgumentTypes(callInstruction.desc);
 
@@ -51,12 +48,10 @@ public class InstructionExtractor extends AbstractPreprocessor implements Opcode
     private static Type getReturnTypeOfInstruction(AbstractInsnNode instruction) {
         if (instruction instanceof MultiANewArrayInsnNode) {
             return Type.getType(((MultiANewArrayInsnNode) instruction).desc);
-        } else if (instruction instanceof InvokeDynamicInsnNode) {
-            var invokeDynamic = ((InvokeDynamicInsnNode) instruction);
+        } else if (instruction instanceof InvokeDynamicInsnNode invokeDynamic) {
 
             return Type.getReturnType(invokeDynamic.desc);
-        } else if (instruction instanceof MethodInsnNode) {
-            var callInstruction = ((MethodInsnNode) instruction);
+        } else if (instruction instanceof MethodInsnNode callInstruction) {
 
             return Type.getReturnType(callInstruction.desc);
         }
@@ -125,6 +120,9 @@ public class InstructionExtractor extends AbstractPreprocessor implements Opcode
         insnList.add(new InsnNode(returnType.getOpcode(Opcodes.IRETURN)));
 
         extractedMethod.instructions = insnList;
+        extractedMethod.maxLocals = paramIndex;
+        extractedMethod.maxStack = paramIndex;
+
         return extractedMethod;
     }
 

@@ -52,6 +52,10 @@ public class IntegerArithmeticsExpr extends Expr {
         return other.op == this.op && other.lhs.equivalent(this.rhs) && other.rhs.equivalent(this.rhs);
     }
 
+    public Operator getOperator() {
+        return op;
+    }
+
     @Override
     public void onChildUpdated(int ptr) {
         if (ptr == 0) {
@@ -86,6 +90,14 @@ public class IntegerArithmeticsExpr extends Expr {
     @Override
     public ExprMetadata getMetadata() {
         return new ExprMetadata(ExprMetadata.ExprClass.SECOND, Collections.emptyList());
+    }
+
+    public Expr getRhs() {
+        return rhs;
+    }
+
+    public Expr getLhs() {
+        return lhs;
     }
 
     @Override
@@ -188,6 +200,22 @@ public class IntegerArithmeticsExpr extends Expr {
 
         public String getOperatorName() {
             return operatorName;
+        }
+
+        public int apply(int lhs, int rhs) {
+            return switch (this) {
+                case ADD -> lhs + rhs;
+                case SUB -> lhs - rhs;
+                case MUL -> lhs * rhs;
+                case DIV -> lhs / rhs;
+                case REM -> lhs % rhs;
+                case SHL -> lhs << rhs;
+                case SHR -> lhs >> rhs;
+                case USHR -> lhs >>> rhs;
+                case OR -> lhs | rhs;
+                case AND -> lhs & rhs;
+                case XOR -> lhs ^ rhs;
+            };
         }
     }
 }

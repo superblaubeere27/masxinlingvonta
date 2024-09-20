@@ -27,6 +27,7 @@
         <module>masxinlingvonta-test</module>
         <module>masxinlingvonta-cli</module>
         <module>masxinlingvonta-opt</module>
+        <module>masxinlingvonta-test-runtime</module>
     </modules>
 
     <properties>

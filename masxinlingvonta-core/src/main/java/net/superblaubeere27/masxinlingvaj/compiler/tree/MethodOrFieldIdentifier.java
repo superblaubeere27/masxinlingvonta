@@ -51,7 +51,7 @@ public class MethodOrFieldIdentifier {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         MethodOrFieldIdentifier that = (MethodOrFieldIdentifier) o;
-        return hashCode == that.hashCode && Objects.equals(owner, that.owner) && Objects.equals(name,
+        return hashCode() == that.hashCode() && Objects.equals(owner, that.owner) && Objects.equals(name,
                 that.name) && Objects.equals(desc, that.desc);
     }
 

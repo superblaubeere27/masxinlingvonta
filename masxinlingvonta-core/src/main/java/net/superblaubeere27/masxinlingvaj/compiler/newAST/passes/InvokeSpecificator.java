@@ -51,11 +51,11 @@ public class InvokeSpecificator extends Pass {
                         var assumption = analyzer.getStatementSnapshot(stmt).getOrCreateLocalInfo(varExpr.getLocal());
 
                         // Find out discrete values for object type
-                        var typeAssumptions = AssumptionAnalyzer.extractPossibleValues(assumption, AssumptionPredicates.GET_TYPE_ASSUMPTION_PREDICATE);
+                        var typeAssumptions = AssumptionAnalyzer.extractActualValues(assumption, AssumptionPredicates.GET_TYPE_ASSUMPTION_PREDICATE_SET);
 
                         // If discrete values where found, filter by them
-                        if (typeAssumptions.isPresent()) {
-                            impls = filterByAssumptionStates(typeAssumptions.get(), new MethodOrFieldName(call.getTarget()), impls);
+                        for (ObjectTypeAssumptionState typeAssumption : typeAssumptions) {
+                            impls = filterByAssumptionState(typeAssumption, new MethodOrFieldName(call.getTarget()), impls);
                         }
                     }
 
@@ -101,29 +101,32 @@ public class InvokeSpecificator extends Pass {
 
         var remainingCandidates = new ArrayList<>(currentCandidates);
 
-        remainingCandidates.removeIf(candidate -> {
-            for (ObjectTypeAssumptionState.ObjectTypeInfo knownInfo : state.getKnownInfos()) {
-                if (!knownInfo.type().isObject())
-                    continue;
+        for (ObjectTypeAssumptionState.ObjectTypeInfo knownInfo : state.getKnownInfos()) {
+            // Arrays have weird ass logic
+            if (!knownInfo.type().isObject())
+                continue;
 
-                var typeName = knownInfo.type().getTypeOfObject();
+            var typeName = knownInfo.type().getTypeOfObject();
+            var clazz = this.compilerIndex.getClass(typeName);
 
-                var virtualImplementation = ClassHierarchyBuilder.getVirtualImplementation(this.compilerIndex, this.compilerIndex.getClass(typeName), methodName);
 
-                if (knownInfo.relation() == ObjectTypeAssumptionState.ObjectTypeRelation.IS_INSTANCE_OF) {
-                    var isInstanceOf = ClassHierarchyBuilder.isInstanceOf(candidate.getParent(), compilerIndex.getClass(typeName));
-
-                    if (!isInstanceOf && !knownInfo.inverted() && !virtualImplementation.getIdentifier().equals(candidate.getIdentifier()))
-                        return true;
-
-                    if (isInstanceOf && knownInfo.inverted()) {
-                        return true;
-                    }
-                }
+            if (knownInfo.relation() != ObjectTypeAssumptionState.ObjectTypeRelation.IS_INSTANCE_OF) {
+                continue;
             }
 
-            return false;
-        });
+            if (!knownInfo.inverted()) {
+                var virtualImplementation = ClassHierarchyBuilder.getVirtualImplementation(this.compilerIndex, clazz, methodName);
+                var implementations = ClassHierarchyBuilder.getPossibleImplementations(this.compilerIndex, clazz, methodName);
+
+                if (implementations.isEmpty() || virtualImplementation == null) {
+                    continue;
+                }
+
+                remainingCandidates.removeIf(candidate -> !implementations.contains(candidate));
+            } else {
+                remainingCandidates.removeIf(candidate -> ClassHierarchyBuilder.isInstanceOf(candidate.getParent(), clazz));
+            }
+        }
 
         return remainingCandidates;
     }

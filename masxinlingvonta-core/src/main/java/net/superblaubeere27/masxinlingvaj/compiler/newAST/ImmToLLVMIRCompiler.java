@@ -54,9 +54,15 @@ public class ImmToLLVMIRCompiler {
 
         for (int i = 0; i < switchStmt.getKeys().length; i++) {
             var key = switchStmt.getKeys()[i];
-            var block = ctx.getLLVMBlock(switchStmt.getNextBasicBlocks()[i]);
+            var mlvirBlock = switchStmt.getNextBasicBlocks()[i];
+            var llvmBlock = ctx.getLLVMBlock(mlvirBlock);
 
-            LLVM.LLVMAddCase(builtSwitch, LLVM.LLVMConstInt(JNIType.INT.getLLVMType(), key, 1), block);
+            // This is a workaround for llvm because it does not like switch statements
+            // that have cases that point to the default block...
+            if (mlvirBlock == switchStmt.getDefaultBlock())
+                continue;
+
+            LLVM.LLVMAddCase(builtSwitch, LLVM.LLVMConstInt(JNIType.INT.getLLVMType(), key, 1), llvmBlock);
         }
     }
 

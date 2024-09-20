@@ -1,0 +1,39 @@
+net/superblaubeere27/masxinlingvonta/test/inheritance/TestInlineOpportunities.testB(Lnet/superblaubeere27/masxinlingvonta/test/inheritance/TestInlineOpportunities$S;)I:
+L4:
+   %5A = params[0];
+   br %5A === null if L6, else L1
+L1:
+   %3I = instanceof<net/superblaubeere27/masxinlingvonta/test/inheritance/TestInlineOpportunities$D>(%5A);
+   br %3I != 0 if L2, else L7
+L7:
+   br L9
+L9:
+   %11I = ((net/superblaubeere27/masxinlingvonta/test/inheritance/TestInlineOpportunities$S) %5A).test()I<INVOKE_VIRTUAL>();
+   br L10, on_exception L5
+L10:
+   %13I = mul %11I, 2;
+   ret %13I
+L2:
+   %4I = instanceof<net/superblaubeere27/masxinlingvonta/test/inheritance/TestInlineOpportunities$A>(%5A);
+   br %4I == 0 if L3, else L11
+L11:
+   br L13
+L13:
+   %8I = ((net/superblaubeere27/masxinlingvonta/test/inheritance/TestInlineOpportunities$S) %5A).test()I<INVOKE_VIRTUAL>();
+   br L14, on_exception L5
+L14:
+   %10I = mul %8I, 7;
+   ret %10I
+L3:
+   br L16
+L16:
+   br L18
+L18:
+   br L17, on_exception L5
+L5:
+   ret 0
+L17:
+   %7I = mul 3, 17;
+   ret %7I
+L6:
+   ret -1

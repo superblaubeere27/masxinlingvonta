@@ -1,0 +1,9 @@
+{
+  "cfgTests": {
+    "testA": [
+      {
+        "name": "expectEmpty"
+      }
+    ]
+  }
+}

@@ -6,9 +6,7 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.PhiExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.VarExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.compare.IntegerCompareExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.compare.ObjectCompareExpr;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.constants.ConstNullExpr;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.constants.ConstStringExpr;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.constants.ConstTypeExpr;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.constants.*;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.exceptionHandling.CatchExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.AllocObjectExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.LoadFieldExpr;
@@ -17,11 +15,11 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.array.ArrayLo
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.invoke.InvokeExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.object.CheckCastExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.object.InstanceOfExpr;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.AssumptionAnalyzer;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.PrimitiveAssumptionState;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.relations.LinkedAssumptions;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.relations.NumberRelation;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.relations.ObjectRelation;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.relations.VariableRelationObject;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.derivedAssumptions.DerivedAssumptionFromNumberValue;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.functionAssumptions.InstrinsicAssumptions;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.relations.*;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.instSimplify.ExpressionSimplifier;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches.BranchStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches.ConditionalBranch;
@@ -34,9 +32,7 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.jvm.ThrowStmt;
 import net.superblaubeere27.masxinlingvaj.utils.Pair;
 import org.objectweb.asm.Type;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.*;
 import java.util.function.BiFunction;
 import java.util.stream.Stream;
 
@@ -45,6 +41,8 @@ import static net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis
 
 
 public class LocalVariableAnalyzer {
+    private static final int MAX_BLOCKS = 200;
+
     public final ExpressionSimplifier simplifier;
     private final ControlFlowGraph cfg;
     private final HashMap<Stmt, LocalInfoSnapshot> snapshots = new HashMap<>();
@@ -100,7 +98,6 @@ public class LocalVariableAnalyzer {
      */
     private static Pair<LocalInfoSnapshot, LocalInfoSnapshot> getAssumptionsOfTrueAndFalseValue(LocalInfoSnapshot current, Expr expr) {
         if (expr instanceof ObjectCompareExpr compareExpr) {
-
             VarExpr comparedVar;
             Expr otherExpr;
 
@@ -129,7 +126,53 @@ public class LocalVariableAnalyzer {
             ifNotEqualSnapshot.putLocalInfo(comparedVar.getLocal(), ifNotEquals);
 
             return new Pair<>(ifEqualSnapshot, ifNotEqualSnapshot);
-        } else if (expr instanceof InstanceOfExpr instanceOfExpr && instanceOfExpr.getInstance() instanceof VarExpr varExpr) {
+        } else if (expr instanceof IntegerCompareExpr integerCompareExpr && integerCompareExpr.getOperator() == IntegerCompareExpr.Operator.EQUAL && integerCompareExpr.getLhs() instanceof VarExpr varExpr && integerCompareExpr.getRhs() instanceof ConstIntExpr constIntExpr) {
+            var value = constIntExpr.getValue();
+
+            var localInfo = current.getLocalInfo(varExpr.getLocal());
+
+            // TODO: This sucks, Assumption does not implement equals or hashCode
+            var ifValues = AssumptionAnalyzer.extractActualValues(localInfo, assumption -> {
+                if (assumption instanceof DerivedAssumptionFromNumberValue<?> derived && derived.getRelation().getRhs() instanceof ConstantRelationObject<?> constantRelationObject && constantRelationObject.getSubject() instanceof Integer rhs) {
+                    if (derived.getRelation().getOperator().apply(value, rhs)) {
+                        return Set.of(new Pair<>(derived.getTargetLocal(), derived.getThenAssumption()));
+                    }
+                }
+
+                return Collections.emptySet();
+            });
+            var elseValues = AssumptionAnalyzer.extractActualValues(localInfo, assumption -> {
+                if (assumption instanceof DerivedAssumptionFromNumberValue<?> derived && derived.getRelation().getRhs() instanceof ConstantRelationObject<?> constantRelationObject && constantRelationObject.getSubject() instanceof Integer rhs) {
+                    if (!derived.getRelation().getOperator().apply(value, rhs)) {
+                        return Set.of(new Pair<>(derived.getTargetLocal(), derived.getThenAssumption()));
+                    }
+                }
+
+                return Collections.emptySet();
+            });
+
+
+            var ifEqualSnapshot = current.copy();
+            var elseSnapshot = current.copy();
+
+            for (Pair<Local, Assumption> localAssumptionPair : ifValues) {
+                var currSnapshot = ifEqualSnapshot.getOrCreateLocalInfo(localAssumptionPair.getFirst());
+
+                currSnapshot = LinkedAssumptions.and(currSnapshot, localAssumptionPair.getSecond());
+
+                ifEqualSnapshot.putLocalInfo(localAssumptionPair.getFirst(), currSnapshot);
+            }
+            for (Pair<Local, Assumption> localAssumptionPair : elseValues) {
+                var currSnapshot = elseSnapshot.getOrCreateLocalInfo(localAssumptionPair.getFirst());
+
+                currSnapshot = LinkedAssumptions.and(currSnapshot, localAssumptionPair.getSecond());
+
+                elseSnapshot.putLocalInfo(localAssumptionPair.getFirst(), currSnapshot);
+            }
+
+            return new Pair<>(ifEqualSnapshot, elseSnapshot);
+        }
+        /**else if (expr instanceof InstanceOfExpr instanceOfExpr && instanceOfExpr.getInstance() instanceof VarExpr varExpr) {
             var isInstanceSnapshot = current.copy();
             var isNotInstanceSnapshot = current.copy();
 
@@ -141,7 +184,7 @@ public class LocalVariableAnalyzer {
 
             isInstanceSnapshot.putLocalInfo(varExpr.getLocal(), ifInstance);
             isNotInstanceSnapshot.putLocalInfo(varExpr.getLocal(), ifNotInstance);
-        }
+         }*/
 
         return new Pair<>(current, current);
     }
@@ -241,7 +284,19 @@ public class LocalVariableAnalyzer {
         return prev;
     }
 
-    private Assumption processExpression(LocalInfoSnapshot snapshot, Expr expr) {
+    private static Assumption getObjectAssumptionForReturnType(Type returnType) {
+        Assumption objectTypeAssumption = Assumption.NoAssumption.INSTANCE;
+
+        if (returnType.getSort() == Type.ARRAY) {
+            objectTypeAssumption = ObjectLocalInfo.create().assumeObjectType(isExactly(new ObjectType(returnType.getInternalName())));
+        } else if (returnType.getSort() == Type.OBJECT) {
+            objectTypeAssumption = ObjectLocalInfo.create().assumeObjectType(isInstanceOf(new ObjectType(returnType.getInternalName())));
+        }
+
+        return objectTypeAssumption;
+    }
+
+    public Assumption processExpression(LocalInfoSnapshot snapshot, Expr expr) {
         var assumptions = processExpression0(snapshot, expr);
 
         if (this.baseLocalInfoFactory != null) {
@@ -262,14 +317,19 @@ public class LocalVariableAnalyzer {
             return ObjectLocalInfo.create().assumeIsNull(false).assumeObjectType(isExactly(new ObjectType("java/lang/Class")));
         } else if (expr instanceof ConstStringExpr) {
             return ObjectLocalInfo.create().assumeIsNull(false).assumeObjectType(isExactly(new ObjectType("java/lang/String")));
+        } else if (expr instanceof ConstIntExpr constIntExpr) {
+            return new NumberRelation<>(new ConstantRelationObject<>(constIntExpr.getValue()), IntegerCompareExpr.Operator.EQUAL);
+        } else if (expr instanceof ConstLongExpr constLongExpr) {
+            return new NumberRelation<>(new ConstantRelationObject<>(constLongExpr.getValue()), IntegerCompareExpr.Operator.EQUAL);
+        } else if (expr instanceof ConstBoolExpr constBoolExpr) {
+            return new NumberRelation<>(new ConstantRelationObject<>(constBoolExpr.getValue() ? 1 : 0), IntegerCompareExpr.Operator.EQUAL);
         } else if (expr instanceof LoadFieldExpr loadExpr) {
             var fieldDesc = Type.getType(loadExpr.getTarget().getDesc());
 
-            if (fieldDesc.getSort() == Type.ARRAY)
-                return ObjectLocalInfo.create().assumeObjectType(isExactly(new ObjectType(fieldDesc.getInternalName())));
+            var intrinsicAssumptions = InstrinsicAssumptions.getAssumptionForFieldLoad(this, snapshot, loadExpr);
+            var objectTypeAssumption = getObjectAssumptionForReturnType(fieldDesc);
 
-            if (fieldDesc.getSort() == Type.OBJECT)
-                return ObjectLocalInfo.create().assumeObjectType(isInstanceOf(new ObjectType(fieldDesc.getInternalName())));
+            return LinkedAssumptions.and(intrinsicAssumptions, objectTypeAssumption);
         } else if (expr instanceof ArrayLoadExpr arrayLoadExpr) {
             Expr arr = arrayLoadExpr.getArray();
 
@@ -320,7 +380,22 @@ public class LocalVariableAnalyzer {
 
                 return assumption;
             }
-        } else if (expr.getType() == ImmType.OBJECT) {
+        } else if (expr instanceof InstanceOfExpr instanceOfExpr && instanceOfExpr.getInstance() instanceof VarExpr varExpr) {
+            var ifAssumption = ObjectLocalInfo.create().assumeObjectType(new ObjectTypeAssumptionState.ObjectTypeInfo(ObjectTypeAssumptionState.ObjectTypeRelation.IS_INSTANCE_OF, false, new ObjectType(instanceOfExpr.getInstanceOfType())));
+            var elseAssumption = ObjectLocalInfo.create().assumeObjectType(new ObjectTypeAssumptionState.ObjectTypeInfo(ObjectTypeAssumptionState.ObjectTypeRelation.IS_INSTANCE_OF, true, new ObjectType(instanceOfExpr.getInstanceOfType())));
+
+            return LinkedAssumptions.and(
+                    new DerivedAssumptionFromNumberValue<>(new NumberRelation<>(new ConstantRelationObject<>(0), IntegerCompareExpr.Operator.EQUAL), varExpr.getLocal(), elseAssumption),
+                    new DerivedAssumptionFromNumberValue<>(new NumberRelation<>(new ConstantRelationObject<>(0), IntegerCompareExpr.Operator.NOT_EQUAL), varExpr.getLocal(), ifAssumption)
+            );
+        } else if (expr instanceof InvokeExpr invokeExpr) {
+            var intrinsicAssumptions = InstrinsicAssumptions.getAssumptionForInvoke(this, snapshot, invokeExpr);
+            var objectTypeAssumption = getObjectAssumptionForReturnType(invokeExpr.getReturnType());
+
+            return LinkedAssumptions.and(intrinsicAssumptions, objectTypeAssumption);
+        }
+
+        if (expr.getType() == ImmType.OBJECT) {
             return ObjectLocalInfo.create();
         }
 
@@ -347,12 +422,30 @@ public class LocalVariableAnalyzer {
     }
 
     public void analyze(LocalInfoSnapshot entrySnapshot) {
+        if (this.cfg.size() > MAX_BLOCKS) {
+            fillWithEmptySnapshots();
+
+            return;
+        }
+
         // In the beginning of a method there cannot be a pending exception
         entrySnapshot.getCallGraphState().setExceptionState(PrimitiveAssumptionState.assume(false));
 
         this.basicBlockSnapshots.put(this.cfg.getEntry(), entrySnapshot);
 
         analyzeBasicBlock(new HashSet<>(), this.cfg.getEntry());
+    }
+
+    private void fillWithEmptySnapshots() {
+        var emptySnapshot = LocalInfoSnapshot.create();
+
+        for (BasicBlock vertex : this.cfg.vertices()) {
+            this.basicBlockSnapshots.put(vertex, emptySnapshot);
+
+            for (Stmt statement : vertex.getStatements()) {
+                this.snapshots.put(statement, emptySnapshot);
+            }
+        }
     }
 
     private void analyzeBasicBlock(HashSet<Integer> finishedBlocks, BasicBlock block) {

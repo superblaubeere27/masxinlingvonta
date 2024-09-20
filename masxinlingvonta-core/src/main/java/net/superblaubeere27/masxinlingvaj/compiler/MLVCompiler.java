@@ -9,6 +9,7 @@ import net.superblaubeere27.masxinlingvaj.compiler.graph.algorithm.RegisterToSSA
 import net.superblaubeere27.masxinlingvaj.compiler.graph.algorithm.SSABlockLivenessAnalyser;
 import net.superblaubeere27.masxinlingvaj.compiler.jni.JNI;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.*;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.asm2ir.NewCodeConverter;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.codegen.FunctionCodegenContext;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.VarExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.constants.ConstStringExpr;
@@ -17,12 +18,13 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.invoke.Invoke
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.DeleteLocalsRefsPass;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.InlineLocalPass;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.InvokeSpecificator;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.RedundantExpressionAndAssignmentRemover;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.cfg.CfgPruning;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.inlining.InliningPass;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.inlining.heap2reg.Heap2RegPass;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.instSimplify.InstSimplifyPass;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.instSimplify.ReuseLocalsPass;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.instSimplify.deadCode.DeadCodeRemover;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.instSimplify.reuseLocals.ReuseLocalsPass;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.normalize.NormalizerPass;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.ExpressionStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.copy.CopyPhiStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.copy.CopyVarStmt;
@@ -57,14 +59,16 @@ public class MLVCompiler {
         this.optimizerSettings = optimizerSettings;
         this.index = new CompilerIndex(inputClasses, libraryClasses);
 
-        this.index.buildHierarchy();
-
-        this.analyzeMethods(new HashMap<>());
-
         this.createModule();
 
         this.onLoadBuilder = new OnLoadBuilder(this);
         this.intrinsicMethods = IntrinsicMethods.create(this);
+    }
+
+    public void buildTrees() {
+        this.index.buildHierarchy();
+
+        this.analyzeMethods(new HashMap<>());
     }
 
     private void createModule() {
@@ -245,10 +249,12 @@ public class MLVCompiler {
     }
 
     private ControlFlowGraph createControlFlowGraph(CompilerMethod method) throws AnalyzerException {
-        ControlFlowGraph cfg = NewCodeConverter.convert(this, Objects.requireNonNull(method));
+        ControlFlowGraph cfg = new NewCodeConverter(this, Objects.requireNonNull(method)).convert();
 
         RegisterToSSA registerToSSA = new RegisterToSSA(cfg);
         registerToSSA.process();
+
+        cfg.verify();
 
         optimize(cfg);
 
@@ -256,15 +262,19 @@ public class MLVCompiler {
     }
 
     private void optimize(ControlFlowGraph cfg) {
+        NormalizerPass normalizerPass = new NormalizerPass();
+
+        normalizerPass.apply(cfg);
+
         InlineLocalPass inlineLocalPass = new InlineLocalPass();
 
         inlineLocalPass.apply(cfg);
 
         cfg.verify();
 
-        RedundantExpressionAndAssignmentRemover redundantExpressionAndAssignmentRemover = new RedundantExpressionAndAssignmentRemover();
+        DeadCodeRemover deadCodeRemover = new DeadCodeRemover();
 
-        redundantExpressionAndAssignmentRemover.apply(cfg);
+        deadCodeRemover.apply(cfg);
 
         cfg.verify();
 
@@ -286,7 +296,7 @@ public class MLVCompiler {
 
         cfg.verify();
 
-        redundantExpressionAndAssignmentRemover.apply(cfg);
+        deadCodeRemover.apply(cfg);
 
         InvokeSpecificator specificator = new InvokeSpecificator(this.index);
 
@@ -402,5 +412,13 @@ public class MLVCompiler {
 
     public OnLoadBuilder getOnLoadBuilder() {
         return onLoadBuilder;
+    }
+
+    public void dumpClassCfg(List<String> classNames, PrintStream outs) {
+        this.functionCodegenContexts.forEach((compilerMethod, codegenContext) -> {
+            if (classNames.stream().anyMatch(s -> compilerMethod.getIdentifier().getName().startsWith(s))) {
+                outs.println(codegenContext.getCfg().toString());
+            }
+        });
     }
 }

@@ -42,23 +42,8 @@ public class CfgPruning extends Pass {
         });
     }
 
-    @Override
-    public void apply(ControlFlowGraph cfg) {
-        CfgWalking cfgWalking = new CfgWalking(this.compiler);
-
-        boolean changed;
-
-        do {
-            changed = replaceDuplicates(cfg);
-            cfg.verify();
-
-            changed |= mergeBlocks(cfg);
-            cfg.verify();
-
-            changed |= cfgWalking.apply(cfg);
-
-            cfg.verify();
-        } while (changed);
+    public static Stream<PhiExpr> phiStream(BasicBlock dst) {
+        return dst.stream().takeWhile(x -> x instanceof CopyPhiStmt).map(x -> ((CopyPhiStmt) x).getExpression());
     }
 
     private boolean mergeBlocks(ControlFlowGraph cfg) {
@@ -163,8 +148,25 @@ public class CfgPruning extends Pass {
         }
     }
 
-    private Stream<PhiExpr> phiStream(BasicBlock dst) {
-        return dst.stream().takeWhile(x -> x instanceof CopyPhiStmt).map(x -> ((CopyPhiStmt) x).getExpression());
+    @Override
+    public void apply(ControlFlowGraph cfg) {
+        CfgWalking cfgWalking = new CfgWalking(this.compiler);
+
+        boolean changed;
+
+        do {
+            changed = replaceDuplicates(cfg);
+            cfg.verify();
+
+            changed |= mergeBlocks(cfg);
+            cfg.verify();
+
+            var b = cfg.toString();
+
+            changed |= cfgWalking.apply(cfg);
+
+            cfg.verify();
+        } while (changed);
     }
 
     private boolean replaceDuplicates(ControlFlowGraph cfg) {

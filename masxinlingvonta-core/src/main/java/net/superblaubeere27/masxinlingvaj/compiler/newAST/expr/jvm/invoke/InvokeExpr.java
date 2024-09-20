@@ -2,8 +2,17 @@ package net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.invoke;
 
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.Expr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.ImmType;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.ExprMetadata;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.properties.InstProperty;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.properties.ReadsMemoryProperty;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.properties.ThrowsProperty;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.properties.WritesMemoryProperty;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.inlining.JavaIntrinsicMethods;
 import net.superblaubeere27.masxinlingvaj.compiler.tree.MethodOrFieldIdentifier;
 import org.objectweb.asm.Type;
+
+import java.util.Arrays;
+import java.util.List;
 
 public abstract class InvokeExpr extends Expr {
     protected final Type[] argTypes;
@@ -51,5 +60,18 @@ public abstract class InvokeExpr extends Expr {
 
     public Type getReturnType() {
         return returnType;
+    }
+
+    public static final List<InstProperty> DEFAULT_PROPERTIES = Arrays.asList(
+            ReadsMemoryProperty.INSTANCE,
+            WritesMemoryProperty.INSTANCE,
+            ThrowsProperty.INSTANCE
+    );
+
+    @Override
+    public ExprMetadata getMetadata() {
+        var intrinsicParameters = JavaIntrinsicMethods.getPropertiesOfMethod(this.target);
+
+        return new ExprMetadata(ExprMetadata.ExprClass.SECOND, intrinsicParameters == null ? DEFAULT_PROPERTIES : intrinsicParameters);
     }
 }

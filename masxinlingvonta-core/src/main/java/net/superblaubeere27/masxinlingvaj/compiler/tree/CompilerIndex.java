@@ -43,8 +43,6 @@ public class CompilerIndex {
         this.classes.addAll(classes);
 
         classes.forEach(this::refreshClass);
-
-        ClassHierarchyBuilder.addGeneratedClasses(this, classes);
     }
 
     public void refreshClass(CompilerClass cc) {

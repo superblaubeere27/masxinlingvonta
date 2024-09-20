@@ -209,7 +209,12 @@ public class InliningPass extends Pass {
                     if (!(child instanceof InvokeExpr invokeExpr))
                         continue;
 
+                    if (!JavaIntrinsicMethods.mayInline(invokeExpr.getTarget())) {
+                        continue;
+                    }
+
                     var target = this.compiler.getIndex().getMethod(invokeExpr.getTarget());
+
 
                     // We don't want to inline the method into itself on recursion
                     if (cfg.getCompilerMethod() == target)

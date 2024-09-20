@@ -358,7 +358,14 @@ public class ControlFlowGraph extends FlowGraph<BasicBlock, FlowEdge<BasicBlock>
         var declaringStatementDoms = dominanceAnalyzer.getDominates(declaringStatement.getBlock());
 
         if (varExpr.getBlock() == declaringBlock) {
-            if (declaringBlock.indexOf(varExpr.getRootParent()) <= declaringBlock.indexOf(declaringStatement)) {
+            var rootParent = varExpr.getRootParent();
+
+            // Everything is ok. If a phi accesses a variable coming from it's own block, it's always ok,
+            // as long as the variable is declared within that block.
+            if (rootParent instanceof CopyPhiStmt && declaringBlock.contains(declaringStatement))
+                return;
+
+            if (declaringBlock.indexOf(rootParent) <= declaringBlock.indexOf(declaringStatement)) {
                 try (PrintStream writer = new PrintStream(new FileOutputStream("testJars/test.dot"))) {
                     this.toGraphViz(writer);
                 } catch (FileNotFoundException e) {
