@@ -1,5 +1,7 @@
 package net.superblaubeere27.masxinlingvonta.test.framework;
 
+import java.lang.reflect.Method;
+
 public class TestExecutor {
 
     public static void main(String[] args) {
@@ -7,7 +9,7 @@ public class TestExecutor {
             System.loadLibrary(args[0]);
         }
 
-        var failureFlag = false;
+        boolean failureFlag = false;
 
         for (int i = 1; i < args.length; i++) {
             if (!runTest(args[i])) {
@@ -28,7 +30,7 @@ public class TestExecutor {
 
     private static boolean runTest(String name) {
         try {
-            var clazz = Class.forName(name);
+            Class<?> clazz = Class.forName(name);
 
             clazz.getMethod("main", String[].class).invoke(null, (Object) new String[0]);
 
@@ -42,9 +44,9 @@ public class TestExecutor {
 
     private static boolean runCfgTest(String name) {
         try {
-            var clazz = Class.forName(name);
+            Class<?> clazz = Class.forName(name);
 
-            var method = clazz.getMethod("verifyCFGText", String[].class);
+            Method method = clazz.getMethod("verifyCFGText", String[].class);
 
             method.invoke(null, (Object) new String[0]);
 

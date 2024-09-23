@@ -1,7 +1,12 @@
-package net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.specialObject;
+package net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.object.specialObject;
 
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.Assumption;
 
+import java.util.Objects;
+
+/**
+ * Assumption about the content of a box (i.e. {@link Integer})
+ */
 public class BoxSpecialObjectAssumption extends Assumption {
     /**
      * Type of the box. i.e. `java/lang/Integer`
@@ -15,8 +20,21 @@ public class BoxSpecialObjectAssumption extends Assumption {
     }
 
     @Override
-    public boolean equivalent(Assumption other) {
-        return other instanceof BoxSpecialObjectAssumption otherBox && this.boxType.equals(otherBox.boxType) && this.assumption.equivalent(otherBox);
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        BoxSpecialObjectAssumption that = (BoxSpecialObjectAssumption) o;
+        return Objects.equals(boxType, that.boxType) && Objects.equals(assumption, that.assumption);
+    }
+
+    @Override
+    public AssumptionKey getKey() {
+        return new SingleKeyAssumptionKey(this.getClass(), this.boxType);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(boxType, assumption);
     }
 
     public String getBoxType() {

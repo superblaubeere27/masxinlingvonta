@@ -47,7 +47,7 @@ public abstract class FlowGraph<N extends FastGraphVertex, E extends FlowEdge<N>
     public boolean addVertex(N v) {
         boolean ret = super.addVertex(v);
 
-        int index = v.getNumericId();
+        int index = v.numericId();
         assert (!indexMap.containsKey(index) || indexMap.get(index) == v); // ensure no id collisions
         indexMap.put(index, v);
         indexedSet.set(index, true);
@@ -59,7 +59,7 @@ public abstract class FlowGraph<N extends FastGraphVertex, E extends FlowEdge<N>
         super.addEdge(e);
 
         N src = e.src();
-        int index = src.getNumericId();
+        int index = src.numericId();
         assert (!indexMap.containsKey(index) || indexMap.get(index) == src); // ensure no id collisions
         indexMap.put(index, src);
         indexedSet.set(index, true);
@@ -78,7 +78,7 @@ public abstract class FlowGraph<N extends FastGraphVertex, E extends FlowEdge<N>
         entries.remove(v);
         super.removeVertex(v);
 
-        int index = v.getNumericId();
+        int index = v.numericId();
         indexMap.remove(index);
         indexedSet.set(index, false);
     }
@@ -130,7 +130,7 @@ public abstract class FlowGraph<N extends FastGraphVertex, E extends FlowEdge<N>
     private class FastGraphVertexBitSetIndexer implements BitSetIndexer<N> {
         @Override
         public int getIndex(N basicBlock) {
-            return basicBlock.getNumericId();
+            return basicBlock.numericId();
         }
 
         @Override

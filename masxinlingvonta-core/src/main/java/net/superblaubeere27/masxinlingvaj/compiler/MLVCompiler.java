@@ -22,6 +22,7 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.cfg.CfgPruning;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.inlining.InliningPass;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.inlining.heap2reg.Heap2RegPass;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.instSimplify.InstSimplifyPass;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.instSimplify.UseVariableAliases;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.instSimplify.deadCode.DeadCodeRemover;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.instSimplify.reuseLocals.ReuseLocalsPass;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.normalize.NormalizerPass;
@@ -111,8 +112,8 @@ public class MLVCompiler {
         for (ControlFlowGraph value : methodCfgMap.values()) {
             runPasses(value);
 
-            if (value.getCompilerMethod().getIdentifier().toString().contains("Test.testShit")) {
-                try (PrintStream writer = new PrintStream(new FileOutputStream("testJars/test.dot"))) {
+            if (value.getCompilerMethod().getIdentifier().toString().contains(".test")) {
+                try (PrintStream writer = new PrintStream(new FileOutputStream("testScrap/test.dot"))) {
                     value.verify();
                     value.toGraphViz(writer);
                 } catch (FileNotFoundException e) {
@@ -288,11 +289,18 @@ public class MLVCompiler {
 
         reuseLocalsPass.apply(cfg);
 
+        UseVariableAliases useVariableAliases = new UseVariableAliases();
+
+        useVariableAliases.apply(cfg);
+
+        deadCodeRemover.apply(cfg);
+
         cfg.verify();
 
         InstSimplifyPass simplifyPass = new InstSimplifyPass(this.index);
 
         simplifyPass.apply(cfg);
+        inlineLocalPass.apply(cfg);
 
         cfg.verify();
 

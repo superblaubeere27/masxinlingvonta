@@ -15,9 +15,9 @@ public class AssumptionAnalyzer {
      *
      * @param fun Remapping function. May return null or NO_ASSUMPTION if the assumption cannot be remapped.
      */
-    public static Assumption remapAssumption(Assumption assumption, Function<Assumption, Assumption> fun) {
+    public static Assumption extractAssumption(Assumption assumption, Function<Assumption, Assumption> fun) {
         if (assumption instanceof LinkedAssumptions linkedAssumption) {
-            var assumptions = linkedAssumption.getAssumptionList().stream().map(fun).filter(Objects::nonNull).toArray(Assumption[]::new);
+            var assumptions = linkedAssumption.getInnerAssumptions().stream().map(x -> extractAssumption(x, fun)).filter(Objects::nonNull).toArray(Assumption[]::new);
 
             return switch (linkedAssumption.getLinkType()) {
                 case AND -> LinkedAssumptions.and(assumptions);
@@ -54,8 +54,8 @@ public class AssumptionAnalyzer {
             // It might seem paradox that AND is handled by or assumption and vice-versa.
             // But since the AND-link means that all assumptions apply at the same time.
             return switch (linkedAssumption.getLinkType()) {
-                case AND -> orPossibleValues(linkedAssumption.getAssumptionList(), leafPredicate, possibleValues);
-                case OR -> andPossibleValues(linkedAssumption.getAssumptionList(), leafPredicate, possibleValues);
+                case AND -> orPossibleValues(linkedAssumption.getInnerAssumptions(), leafPredicate, possibleValues);
+                case OR -> andPossibleValues(linkedAssumption.getInnerAssumptions(), leafPredicate, possibleValues);
             };
         }
 
@@ -81,15 +81,15 @@ public class AssumptionAnalyzer {
     public static <T> HashSet<T> extractActualValues(Assumption assumption, Function<Assumption, Set<T>> leafPredicate) {
         if (assumption instanceof LinkedAssumptions linkedAssumptions) {
             return switch (linkedAssumptions.getLinkType()) {
-                case AND -> orValues(linkedAssumptions.getAssumptionList(), leafPredicate);
-                case OR -> andValues(linkedAssumptions.getAssumptionList(), leafPredicate);
+                case AND -> orValues(linkedAssumptions.getInnerAssumptions(), leafPredicate);
+                case OR -> andValues(linkedAssumptions.getInnerAssumptions(), leafPredicate);
             };
         }
 
         return new HashSet<>(leafPredicate.apply(assumption));
     }
 
-    private static <T> HashSet<T> andValues(List<Assumption> assumptionList, Function<Assumption, Set<T>> leafPredicate) {
+    private static <T> HashSet<T> andValues(Collection<Assumption> assumptionList, Function<Assumption, Set<T>> leafPredicate) {
         HashSet<T> values = null;
 
         for (Assumption assumption : assumptionList) {
@@ -105,7 +105,7 @@ public class AssumptionAnalyzer {
         return values == null ? new HashSet<>() : values;
     }
 
-    private static <T> HashSet<T> orValues(List<Assumption> assumptionList, Function<Assumption, Set<T>> leafPredicate) {
+    private static <T> HashSet<T> orValues(Collection<Assumption> assumptionList, Function<Assumption, Set<T>> leafPredicate) {
         HashSet<T> values = null;
 
         for (Assumption assumption : assumptionList) {
@@ -126,8 +126,8 @@ public class AssumptionAnalyzer {
             // It might seem paradox that AND is handled by or assumption and vice-versa.
             // But since the AND-link means that all assumptions apply at the same time.
             return switch (linkedAssumption.getLinkType()) {
-                case AND -> orValue(linkedAssumption.getAssumptionList(), leafPredicate);
-                case OR -> andValue(linkedAssumption.getAssumptionList(), leafPredicate);
+                case AND -> orValue(linkedAssumption.getInnerAssumptions(), leafPredicate);
+                case OR -> andValue(linkedAssumption.getInnerAssumptions(), leafPredicate);
             };
         }
 
@@ -139,8 +139,8 @@ public class AssumptionAnalyzer {
             // It might seem paradox that AND is handled by or assumption and vice-versa.
             // But since the AND-link means that all assumptions apply at the same time.
             return switch (linkedAssumption.getLinkType()) {
-                case AND -> or(linkedAssumption.getAssumptionList(), leafPredicate);
-                case OR -> and(linkedAssumption.getAssumptionList(), leafPredicate);
+                case AND -> or(linkedAssumption.getInnerAssumptions(), leafPredicate);
+                case OR -> and(linkedAssumption.getInnerAssumptions(), leafPredicate);
             };
         }
 
@@ -150,7 +150,7 @@ public class AssumptionAnalyzer {
     /**
      * If all leaf predicates yield the same value, this function will return this value.
      */
-    private static <T> Optional<T> andValue(List<Assumption> assumptionList, Function<Assumption, Optional<T>> leafPredicate) {
+    private static <T> Optional<T> andValue(Collection<Assumption> assumptionList, Function<Assumption, Optional<T>> leafPredicate) {
         boolean first = true;
         Optional<T> currentValue = Optional.empty();
 
@@ -178,7 +178,7 @@ public class AssumptionAnalyzer {
     /**
      * If all leaf predicates yield the same value, this function will return this value.
      */
-    private static <T> boolean andPossibleValues(List<Assumption> assumptionList, Function<Assumption, Optional<T>> leafPredicate, HashSet<T> values) {
+    private static <T> boolean andPossibleValues(Collection<Assumption> assumptionList, Function<Assumption, Optional<T>> leafPredicate, HashSet<T> values) {
         if (assumptionList.isEmpty())
             return false;
 
@@ -195,11 +195,11 @@ public class AssumptionAnalyzer {
         return true;
     }
 
-    private static <T> Optional<T> orValue(List<Assumption> assumptionList, Function<Assumption, Optional<T>> leafPredicate) {
+    private static <T> Optional<T> orValue(Collection<Assumption> assumptionList, Function<Assumption, Optional<T>> leafPredicate) {
         return assumptionList.stream().map(x -> extractValue(x, leafPredicate)).filter(Optional::isPresent).findFirst().orElse(Optional.empty());
     }
 
-    private static <T> boolean orPossibleValues(List<Assumption> assumptionList, Function<Assumption, Optional<T>> leafPredicate, HashSet<T> values) {
+    private static <T> boolean orPossibleValues(Collection<Assumption> assumptionList, Function<Assumption, Optional<T>> leafPredicate, HashSet<T> values) {
         // For a (valid) AND assumption it is enough to find exactly one child that yields discrete values.
         // This is because every child applies at the same time and different child cannot contradict.
         // i.e. (y=5 OR x=false) AND (y=5 OR y=4) -> [5,4]
@@ -218,11 +218,11 @@ public class AssumptionAnalyzer {
         return false;
     }
 
-    private static boolean or(List<Assumption> assumptionList, Predicate<Assumption> leafPredicate) {
+    private static boolean or(Collection<Assumption> assumptionList, Predicate<Assumption> leafPredicate) {
         return assumptionList.stream().anyMatch(assumption -> canBeAssumed(assumption, leafPredicate));
     }
 
-    private static boolean and(List<Assumption> assumptionList, Predicate<Assumption> leafPredicate) {
+    private static boolean and(Collection<Assumption> assumptionList, Predicate<Assumption> leafPredicate) {
         return !assumptionList.isEmpty() && assumptionList.stream().allMatch(assumption -> canBeAssumed(assumption, leafPredicate));
     }
 

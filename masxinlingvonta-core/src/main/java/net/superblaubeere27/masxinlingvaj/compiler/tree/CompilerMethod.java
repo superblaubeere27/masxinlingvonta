@@ -4,6 +4,7 @@ import net.superblaubeere27.masxinlingvaj.analysis.BytecodeMethodAnalyzer;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.ControlFlowGraph;
 import net.superblaubeere27.masxinlingvaj.preprocessor.CompilerPreprocessor;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import java.lang.reflect.Modifier;
@@ -82,6 +83,12 @@ public class CompilerMethod {
 
     public boolean canBeOutsourced() {
         var hasCode = !this.parent.isInterface() && (this.methodNode.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) == 0;
+
+        for (AbstractInsnNode instruction : this.methodNode.instructions) {
+            if (instruction.getOpcode() == Opcodes.INVOKEDYNAMIC) {
+                return false;
+            }
+        }
 
         return hasCode && !this.getIdentifier().getName().startsWith("mlv$");
     }

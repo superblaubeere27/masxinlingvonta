@@ -20,7 +20,7 @@ import static org.bytedeco.llvm.global.LLVM.LLVMDumpModule;
 import static org.bytedeco.llvm.global.LLVM.LLVMPrintModuleToFile;
 
 public class Main {
-    public static final boolean RUN_TESTS = false;
+    public static final boolean RUN_TEST_JARS = true;
     private static final ExecutorServiceFactory EXECUTOR_SERVICE_FACTORY = () -> Executors.newFixedThreadPool(12);
     private static final String[] LIBRARIES = {
             "C:/Users/superblaubeere27/.jdks/adopt-openjdk-1.8.0_302/jre/lib/charsets.jar",
@@ -54,9 +54,9 @@ public class Main {
                             if (aClass.isLibrary())
                                 continue;
 
-                            if (!RUN_TESTS && aClass.getClassNode().name.startsWith("compiler/escapeAnalysis/cr"))
+                            if (!RUN_TEST_JARS && aClass.getClassNode().name.startsWith("compiler/escapeAnalysis/cr"))
                                 continue;
-                            if (!RUN_TESTS) {
+                            if (!RUN_TEST_JARS) {
                                 // Get the class name without the package
                                 var className = aClass.getClassNode().name.substring(aClass.getClassNode().name.lastIndexOf("/") + 1);
 
@@ -67,7 +67,7 @@ public class Main {
                                 continue;
 //                            if (RUN_TESTS && !aClass.getClassNode().name.equals("Test") && !aClass.getClassNode().name.startsWith("Test$"))
 //                                continue;
-                            if (!RUN_TESTS && (aClass.getClassNode().name.equals("Asserts") || aClass.getClassNode().name.equals("MainLoader")))
+                            if (!RUN_TEST_JARS && (aClass.getClassNode().name.equals("Asserts") || aClass.getClassNode().name.equals("MainLoader")))
                                 continue;
 
                             for (CompilerMethod method : aClass.getMethods()) {
@@ -77,7 +77,6 @@ public class Main {
                                         || method.getIdentifier().getName().equals("main")
 //                                        || !RUN_TESTS && !method.getIdentifier().getName().equals("func_1")
 //                                        || RUN_TESTS && !method.getNode().name.startsWith("setup")
-                                        || RUN_TESTS && !method.getNode().name.startsWith("test")
 //                                        || !method.getParent().getName().equals("Test$Vec3") || !method.getNode().name.equals("absSquared")
                                 )
                                     continue;
@@ -96,10 +95,10 @@ public class Main {
 //                new AnnotationPreprocessor()
         ));
 
-        if (!RUN_TESTS) {
+        if (!RUN_TEST_JARS) {
             mlv.loadInput(new File("D:\\Projects\\IntelliJ\\mlv-test-generator\\cc\\cc.jar"));
         } else {
-            mlv.loadInput(new File("testJars/Test.jar"));
+            mlv.loadInput(new File("testJars/APathfinding-Visual.jar"));
         }
 
         mlv.loadLibraries(Arrays.stream(LIBRARIES).map(x -> {
@@ -113,10 +112,10 @@ public class Main {
 
         mlv.preprocessAndCompile(new OptimizerSettings(true));
 
-        if (!RUN_TESTS) {
+        if (!RUN_TEST_JARS) {
             mlv.writeOutput(new File("D:\\Projects\\IntelliJ\\mlv-test-generator\\cc\\cc-obf.jar"));
         } else {
-            mlv.writeOutput(new File("testJars/Test-obf.jar"));
+            mlv.writeOutput(new File("testJars/APathfinding-Visual-obf.jar"));
         }
 
         LLVMPrintModuleToFile(mlv.getLLVMModule(), "testJars/test-native.ll", new byte[0]);
@@ -127,8 +126,23 @@ public class Main {
 
         LLVMPrintModuleToFile(mlv.getLLVMModule(), "testJars/test-native.ll", new byte[0]);
 
-        if (RUN_TESTS)
+        if (RUN_TEST_JARS)
             LLVMDumpModule(mlv.getLLVMModule());
+
+        for (CompilerMethod sort : mlv.getCompiler().getIndex().getClass("Sort").getMethods()) {
+            var functionCodegenContext = mlv.getCompiler().getFunctionCodegenContext(sort);
+
+            if (functionCodegenContext == null) {
+                continue;
+            }
+            var cfg = functionCodegenContext.getCfg();
+
+            System.out.println(sort.getIdentifier() + ":");
+
+            System.out.println(cfg);
+
+            System.out.println();
+        }
 
 //        MLVCompiler compiler = new MLVCompiler(InputLoader.loadFiles(Collections.singletonList(new File("testJars/Test.jar").toURI().toURL()), EXECUTOR_SERVICE_FACTORY).getClassNodes());
 //

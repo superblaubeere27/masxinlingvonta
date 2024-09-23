@@ -11,11 +11,12 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.GetFieldExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.array.ArrayLoadExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.invoke.InvokeExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.invoke.InvokeInstanceExpr;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.object.InstanceOfExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.LocalRingAnalyzer;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.ReachabilityAnalysis;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.Assumption;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.LocalVariableAnalyzer;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.ObjectLocalInfo;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.object.NullStateAssumption;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.relations.LinkedAssumptions;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.inlining.heap2reg.Heap2RegPass;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.RetStmt;
@@ -33,7 +34,7 @@ public class InliningHeuristic {
     private static final int BASIC_BLOCK_COST = 3;
     private static final int SPECIAL_INLINE_DISCOUNT = 8;
     private static final int GENERAL_INLINE_DISCOUNT = 50;
-    private static final int OUTSOURCE_BOUNTY = 100;
+    private static final int RING_LIFT_BOUNTY = 100;
     private final MLVCompiler compiler;
     private final CallGraph callGraph;
     private final HashMap<CompilerMethod, ControlFlowGraph> methodCfgMap;
@@ -77,14 +78,20 @@ public class InliningHeuristic {
             case ARRAY_LOAD -> {
                 return cost + (referencesParam(((ArrayLoadExpr) instruction).getArray(), true) ? -6 : 9);
             }
-            case GET_STATIC_FIELD, PUT_STATIC_FIELD, INSTANCEOF, INVOKE_STATIC, INVOKE_INSTANCE -> {
+            case GET_STATIC_FIELD, PUT_STATIC_FIELD, INVOKE_STATIC -> {
                 return cost + 7;
             }
+            case INVOKE_INSTANCE -> {
+                return cost + (referencesParam(((InvokeInstanceExpr) instruction).getInstanceExpr(), false) ? 5 : 7);
+            }
+            case INSTANCEOF -> {
+                return cost + (referencesParam(((InstanceOfExpr) instruction).getInstance(), false) ? -5 : 7);
+            }
             case PUT_FIELD -> {
-                return cost + (referencesParam(((PutFieldStmt) instruction).getInstance(), false) ? -10 : 7);
+                return cost + (referencesParam(((PutFieldStmt) instruction).getInstance(), false) ? -1 : 7);
             }
             case GET_FIELD -> {
-                return cost + (referencesParam(((GetFieldExpr) instruction).getInstance(), false) ? -10 : 7);
+                return cost + (referencesParam(((GetFieldExpr) instruction).getInstance(), false) ? -1 : 7);
             }
             case CHECKCAST -> {
                 return cost + 6;
@@ -114,7 +121,7 @@ public class InliningHeuristic {
     public static Assumption getAdditionalAssumptions(Assumption localInfo, Expr expr) {
         if (expr instanceof GetFieldExpr getFieldExpr) {
             if (referencesParam(getFieldExpr.getInstance(), false)) {
-                return LinkedAssumptions.and(localInfo, ObjectLocalInfo.create().assumeIsNull(false));
+                return LinkedAssumptions.and(localInfo, NullStateAssumption.IS_NON_NULL);
             }
         }
 
@@ -214,7 +221,7 @@ public class InliningHeuristic {
 
         for (Map.Entry<LocalRingAnalyzer.LocalVariableRing, LiftabilityResult> liftableRing : liftableRings.entrySet()) {
             if (liftableRing.getValue().methodsRequiringInliningAndCosts.containsKey(targetCfg.getCompilerMethod())
-                    && liftableRing.getValue().cost < OUTSOURCE_BOUNTY) {
+                    && liftableRing.getValue().cost < RING_LIFT_BOUNTY) {
                 return true;
             }
         }

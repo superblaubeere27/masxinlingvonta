@@ -52,6 +52,8 @@ public class TestCompiler {
 
         return new String[]{
                 "javac",
+                "-source", "8",
+                "-target", "8",
                 "-cp", classPathString,
                 "-d", outputTempFile.getAbsolutePath(),
                 targetClassString

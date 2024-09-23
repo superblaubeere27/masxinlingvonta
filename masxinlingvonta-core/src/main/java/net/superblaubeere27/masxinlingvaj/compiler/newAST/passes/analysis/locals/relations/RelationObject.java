@@ -3,4 +3,7 @@ package net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.local
 public abstract class RelationObject<N> {
     @Override
     public abstract boolean equals(Object obj);
+
+    @Override
+    public abstract int hashCode();
 }

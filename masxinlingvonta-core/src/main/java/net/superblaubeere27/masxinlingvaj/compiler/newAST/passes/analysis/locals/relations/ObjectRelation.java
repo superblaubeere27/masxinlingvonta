@@ -2,6 +2,8 @@ package net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.local
 
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.Assumption;
 
+import java.util.Objects;
+
 /**
  * Basically says the subject is equals/not equals (based on <code>equals</code>) to <code>rhs</code>
  */
@@ -15,8 +17,16 @@ public class ObjectRelation extends Assumption {
     }
 
     @Override
-    public boolean equivalent(Assumption other) {
-        return other instanceof ObjectRelation objectRelation && this.rhs.equals(objectRelation.rhs) && this.equals == objectRelation.equals;
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ObjectRelation that = (ObjectRelation) o;
+        return equals == that.equals && Objects.equals(rhs, that.rhs);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(rhs, equals);
     }
 
     @Override

@@ -161,8 +161,6 @@ public class CfgPruning extends Pass {
             changed |= mergeBlocks(cfg);
             cfg.verify();
 
-            var b = cfg.toString();
-
             changed |= cfgWalking.apply(cfg);
 
             cfg.verify();

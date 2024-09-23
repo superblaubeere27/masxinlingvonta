@@ -34,7 +34,7 @@ public class ExpressionSimplifier {
         } else if (expr instanceof ConstBoolExpr constLongExpr) {
             return Optional.of(constLongExpr.getValue() ? 1L : 0);
         } else if (expr instanceof VarExpr varExpr) {
-            var localInfo = snapshot.getOrCreateLocalInfo(varExpr.getLocal());
+            var localInfo = snapshot.getOrCreateLocalAssumption(varExpr.getLocal());
 
             return AssumptionAnalyzer.extractValue(localInfo, AssumptionPredicates.GET_INT_OR_LONG_PREDICATE);
         }
@@ -48,7 +48,7 @@ public class ExpressionSimplifier {
         } else if (expr instanceof ConstDoubleExpr constDouble) {
             return Optional.of(constDouble.getValue());
         } else if (expr instanceof VarExpr varExpr) {
-            var localInfo = snapshot.getOrCreateLocalInfo(varExpr.getLocal());
+            var localInfo = snapshot.getOrCreateLocalAssumption(varExpr.getLocal());
 
             return AssumptionAnalyzer.extractValue(localInfo, AssumptionPredicates.GET_FLOAT_OR_DOUBLE_PREDICATE);
         }
@@ -57,7 +57,7 @@ public class ExpressionSimplifier {
     }
 
     private static Expr simplifyVarExpr(LocalInfoSnapshot snapshot, VarExpr varExpr) {
-        var localInfo = snapshot.getOrCreateLocalInfo(varExpr.getLocal());
+        var localInfo = snapshot.getOrCreateLocalAssumption(varExpr.getLocal());
 
         if (AssumptionAnalyzer.extractValue(localInfo, AssumptionPredicates.GET_NULL_STATE_PREDICATE).orElse(false)) {
             return new ConstNullExpr();
@@ -74,6 +74,7 @@ public class ExpressionSimplifier {
                 return new ConstIntExpr(assumedValue.get().intValue());
             }
         }
+
 
         return null;
     }
@@ -98,7 +99,7 @@ public class ExpressionSimplifier {
         if (otherExpr.getOpcode() != Opcode.CONST_NULL)
             return null;
 
-        var localInfo = snapshot.getOrCreateLocalInfo(comparedVar.getLocal());
+        var localInfo = snapshot.getOrCreateLocalAssumption(comparedVar.getLocal());
 
         var nullState = AssumptionAnalyzer.extractValue(localInfo, AssumptionPredicates.GET_NULL_STATE_PREDICATE);
 
@@ -146,7 +147,7 @@ public class ExpressionSimplifier {
         if (!(arrayLengthExpr.getArray() instanceof VarExpr arrayVarExpr))
             return null;
 
-        var localInfo = snapshot.getOrCreateLocalInfo(arrayVarExpr.getLocal());
+        var localInfo = snapshot.getOrCreateLocalAssumption(arrayVarExpr.getLocal());
 
         return null;
     }
@@ -171,6 +172,14 @@ public class ExpressionSimplifier {
     }
 
     private Expr simplifyIntegerCompare(LocalInfoSnapshot snapshot, IntegerCompareExpr expr) {
+        if (expr.getLhs() instanceof VarExpr varExprL && expr.getRhs() instanceof VarExpr varExprR) {
+            // Something like %5I == %5I or %5I < %5I
+            if (varExprR.getLocal().equals(varExprL.getLocal())) {
+                // we just replace the variable with an arbitrary 
+                return new ConstBoolExpr(expr.getOperator().apply(0, 0));
+            }
+        }
+
         var lhsOption = extractConstIntValue(snapshot, expr.getLhs());
         var rhsOption = extractConstIntValue(snapshot, expr.getRhs());
 
@@ -212,9 +221,9 @@ public class ExpressionSimplifier {
         if (!(checkCast.getInstance() instanceof VarExpr instance))
             return null;
 
-        var localInfo = snapshot.getOrCreateLocalInfo(instance.getLocal());
+        var localInfo = snapshot.getOrCreateLocalAssumption(instance.getLocal());
 
-        if (localInfo.canBeAssumed(assumption -> AssumptionPredicates.canBeCastedTo(assumption, this.index, checkCast.getCheckedType()))) {
+        if (AssumptionPredicates.canAssumeIsAssignableFrom(localInfo, this.index, checkCast.getCheckedType())) {
             return checkCast.getInstance().copy();
         }
 
@@ -225,14 +234,14 @@ public class ExpressionSimplifier {
         if (!(instanceOfExpr.getInstance() instanceof VarExpr instance))
             return null;
 
-        var localInfo = snapshot.getOrCreateLocalInfo(instance.getLocal());
+        var localInfo = snapshot.getOrCreateLocalAssumption(instance.getLocal());
 
         // If the value is null, it cannot be an instance of anything.
         if (localInfo.extractValue(AssumptionPredicates.GET_NULL_STATE_PREDICATE).orElse(false)) {
             return new ConstBoolExpr(false);
         }
 
-        if (localInfo.canBeAssumed(assumption -> AssumptionPredicates.canBeCastedTo(assumption, this.index, instanceOfExpr.getInstanceOfType()))) {
+        if (AssumptionPredicates.canAssumeIsInstanceOf(localInfo, this.index, instanceOfExpr.getInstanceOfType())) {
             return new ConstBoolExpr(true);
         }
 

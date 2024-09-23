@@ -4,11 +4,13 @@ import net.superblaubeere27.masxinlingvaj.compiler.MLVCompiler;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.*;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.ParamExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.VarExpr;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.constants.ConstTypeExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.RetStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.RetVoidStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches.ExceptionCheckStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches.UnconditionalBranch;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.copy.CopyVarStmt;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.jvm.MonitorStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.StatementTransaction;
 import net.superblaubeere27.masxinlingvaj.compiler.tree.CompilerMethod;
 import org.objectweb.asm.Opcodes;
@@ -18,6 +20,7 @@ import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.analysis.*;
 
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -92,7 +95,7 @@ public class NewCodeConverter implements Opcodes {
         cfg.getEntries().add(currentBasicBlock);
 
         // Copy the params, i.e. %1I = params[0]
-        buildCopyParams();
+        var localArray = buildCopyParams();
 
         ExceptionHandlerGenerator exceptionHandler = new ExceptionHandlerGenerator(this);
 
@@ -153,7 +156,40 @@ public class NewCodeConverter implements Opcodes {
         // Ensure that the last basic block is also in the CFG
         advanceBasicBlock(null);
 
+        // synchronized keyword needs special handling
+        if (Modifier.isSynchronized(this.compilerMethod.getNode().access)) {
+            emitSynchronizedCode(cfg, localArray);
+        }
+
         return cfg;
+    }
+
+    private void emitSynchronizedCode(ControlFlowGraph cfg, Local[] localArray) {
+        var entryBlock = cfg.getEntry();
+
+        var entryInsertIdx = localArray.length == 0 ? 0 : (entryBlock.indexOf(cfg.getLocals().defs.get(localArray[localArray.length - 1])) + 1);
+
+        Local lockedOnLocal;
+
+        if (this.compilerMethod.isStatic()) {
+            lockedOnLocal = cfg.getLocals().allocSynthetic(ImmType.OBJECT);
+
+            // Lock on <method/owner/Class>.class.
+            entryBlock.add(entryInsertIdx++, new CopyVarStmt(new VarExpr(lockedOnLocal), new ConstTypeExpr(Type.getObjectType(this.compilerMethod.getParent().getName()))));
+        } else {
+            // Lock on this
+            lockedOnLocal = localArray[0];
+        }
+
+        entryBlock.add(entryInsertIdx, new MonitorStmt(MonitorStmt.MonitorType.ENTER, new VarExpr(lockedOnLocal)));
+
+        for (BasicBlock vertex : cfg.vertices()) {
+            var terminator = vertex.getTerminator();
+
+            if (terminator instanceof RetStmt || terminator instanceof RetVoidStmt) {
+                vertex.add(vertex.size() - 1, new MonitorStmt(MonitorStmt.MonitorType.EXIT, new VarExpr(lockedOnLocal)));
+            }
+        }
     }
 
     private void removeUnusedExceptionHandlers(ExceptionHandlerGenerator exceptionHandler) {
@@ -174,19 +210,29 @@ public class NewCodeConverter implements Opcodes {
         this.currentBasicBlock = newBlock;
     }
 
-    private void buildCopyParams() {
+    /**
+     * @return The locals for the parameters.
+     */
+    private Local[] buildCopyParams() {
         var paramStackIdx = 0;
 
         var argumentTypes = cfg.getArgumentTypes();
+        var locals = new Local[argumentTypes.length];
 
         // Put the method parameters in the stack
         for (int i = 0; i < argumentTypes.length; i++) {
             var argumentType = argumentTypes[i];
 
-            currentBasicBlock.add(new CopyVarStmt(new VarExpr(cfg.getLocals().getLocal(paramStackIdx, argumentType)), new ParamExpr(cfg, i)));
+            var syntheticVar = cfg.getLocals().allocSynthetic(argumentType);
 
+            currentBasicBlock.add(new CopyVarStmt(new VarExpr(syntheticVar), new ParamExpr(cfg, i)));
+            currentBasicBlock.add(new CopyVarStmt(new VarExpr(cfg.getLocals().getLocal(paramStackIdx, argumentType)), new VarExpr(syntheticVar)));
+
+            locals[i] = syntheticVar;
             paramStackIdx += argumentType.getJvmStackSize();
         }
+
+        return locals;
     }
 
     /**

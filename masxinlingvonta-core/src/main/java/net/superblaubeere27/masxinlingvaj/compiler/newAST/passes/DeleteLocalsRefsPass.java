@@ -145,7 +145,7 @@ public class DeleteLocalsRefsPass extends Pass {
 
             // Create delete statements for all variables that are not known to be null
             List<Stmt> stmtsToAdd = variablesToKill.stream()
-                    .filter(x -> !localAnalyzer.getStatementSnapshot(vertex.getTerminator()).getLocalInfo(x).extractValue(AssumptionPredicates.GET_NULL_STATE_PREDICATE).orElse(false))
+                    .filter(x -> !localAnalyzer.getStatementSnapshot(vertex.getTerminator()).getLocalAssumption(x).extractValue(AssumptionPredicates.GET_NULL_STATE_PREDICATE).orElse(false))
                     .map(x -> new DeleteRefStmt(new VarExpr(x)))
                     .collect(Collectors.toList());
 
@@ -226,7 +226,7 @@ public class DeleteLocalsRefsPass extends Pass {
 
         for (Local killedVar : killedVars) {
             // Don't kill a null value
-            if (localAnalyzer.getBlockSnapshot(edge.dst()).getLocalInfo(killedVar).extractValue(AssumptionPredicates.GET_NULL_STATE_PREDICATE).orElse(false)) {
+            if (localAnalyzer.getBlockSnapshot(edge.dst()).getLocalAssumption(killedVar).extractValue(AssumptionPredicates.GET_NULL_STATE_PREDICATE).orElse(false)) {
                 continue;
             }
 

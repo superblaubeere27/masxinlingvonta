@@ -127,7 +127,7 @@ class RunCommand implements Callable<Integer> {
     private boolean runTest(String testJar, String natives) throws InterruptedException, IOException {
         var testRuntime = String.join(File.pathSeparator, RUNTIME_LIBRARIES) + File.pathSeparator + testJar;
 
-        var javaProcess = new ProcessBuilder("java", "-cp", testRuntime, "net.superblaubeere27.masxinlingvonta.test.framework.TestExecutor", natives, this.name).directory(new File("testScrap")).inheritIO().start().waitFor();
+        var javaProcess = new ProcessBuilder("D:\\Projects\\IntelliJ\\masxinlingvaj\\testJars\\java-1.8.0-openjdk-debug-1.8.0.332-1.b09.ojdkbuild.windows.x86_64\\bin\\java.exe", "-cp", testRuntime, "net.superblaubeere27.masxinlingvonta.test.framework.TestExecutor", natives, this.name).directory(new File("testScrap")).inheritIO().start().waitFor();
 
         return javaProcess == 0;
     }

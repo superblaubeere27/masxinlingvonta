@@ -2,24 +2,26 @@ package net.superblaubeere27.masxinlingvonta.test.deadCodeRemoval;
 
 import net.superblaubeere27.masxinlingvonta.annotation.Outsource;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+
 public class DeadCodeRemovalTests {
-//    static Object obj = new Object();
-//
-//    @Outsource
-//    public static boolean test() {
-//        if (obj.getClass() == Object.class) {
-//            synchronized (obj) {
-//                return true;
-//            }
-//        }
-//        return false;
-//    }
+    public static void main(String[] args) throws InterruptedException {
+    }
 
     @Outsource
-    private static int test(int rhs) {
-        return Integer.valueOf(rhs).intValue();
+    private static Object test(ArrayList<Object> objects) {
+//        Arrays.stream(objects).forEach(x -> {
+//            x.hashCode();
+//        });
+        for (Iterator<Object> iterator = objects.iterator(); iterator.hasNext(); ) {
+            Object object = iterator.next();
+            if (object != null) {
+                return object;
+            }
+        }
+
+        return null;
     }
 
-    public static void main(String[] args) {
-    }
 }

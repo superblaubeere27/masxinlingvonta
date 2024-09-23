@@ -125,27 +125,54 @@ public class IntegerArithmeticsExpr extends Expr {
             case REM:
                 valueRef = LLVM.LLVMBuildSRem(builder, lhs, rhs, "add");
                 break;
-            case SHL:
+            case SHL: {
+                LLVMValueRef andValue;
+
                 if (this.type != IntegerType.LONG) {
-                    valueRef = LLVM.LLVMBuildShl(builder, lhs, rhs, "add");
+                    andValue = LLVM.LLVMConstInt(JNIType.INT.getLLVMType(), 31, 0);
                 } else {
-                    valueRef = LLVM.LLVMBuildShl(builder, lhs, LLVM.LLVMBuildZExt(builder, rhs, JNIType.LONG.getLLVMType(), "zext"), "add");
+                    rhs = LLVM.LLVMBuildZExt(builder, rhs, JNIType.LONG.getLLVMType(), "shlA");
+                    andValue = LLVM.LLVMConstInt(JNIType.LONG.getLLVMType(), 63, 0);
                 }
+
+                var andedValue = LLVM.LLVMBuildAnd(builder, rhs, andValue, "shlB");
+
+                valueRef = LLVM.LLVMBuildShl(builder, lhs, andedValue, "shlC");
+
                 break;
-            case SHR:
+            }
+            case SHR: {
+                LLVMValueRef andValue;
+
                 if (this.type != IntegerType.LONG) {
-                    valueRef = LLVM.LLVMBuildAShr(builder, lhs, rhs, "add");
+                    andValue = LLVM.LLVMConstInt(JNIType.INT.getLLVMType(), 31, 0);
                 } else {
-                    valueRef = LLVM.LLVMBuildAShr(builder, lhs, LLVM.LLVMBuildZExt(builder, rhs, JNIType.LONG.getLLVMType(), "zext"), "add");
+                    rhs = LLVM.LLVMBuildZExt(builder, rhs, JNIType.LONG.getLLVMType(), "shrA");
+                    andValue = LLVM.LLVMConstInt(JNIType.LONG.getLLVMType(), 63, 0);
                 }
+
+                var andedValue = LLVM.LLVMBuildAnd(builder, rhs, andValue, "shrB");
+
+                valueRef = LLVM.LLVMBuildAShr(builder, lhs, andedValue, "shrC");
+
                 break;
-            case USHR:
+            }
+            case USHR: {
+                LLVMValueRef andValue;
+
                 if (this.type != IntegerType.LONG) {
-                    valueRef = LLVM.LLVMBuildLShr(builder, lhs, rhs, "add");
+                    andValue = LLVM.LLVMConstInt(JNIType.INT.getLLVMType(), 31, 0);
                 } else {
-                    valueRef = LLVM.LLVMBuildLShr(builder, lhs, LLVM.LLVMBuildZExt(builder, rhs, JNIType.LONG.getLLVMType(), "zext"), "add");
+                    rhs = LLVM.LLVMBuildZExt(builder, rhs, JNIType.LONG.getLLVMType(), "ushrA");
+                    andValue = LLVM.LLVMConstInt(JNIType.LONG.getLLVMType(), 63, 0);
                 }
+
+                var andedValue = LLVM.LLVMBuildAnd(builder, rhs, andValue, "ushrB");
+
+                valueRef = LLVM.LLVMBuildLShr(builder, lhs, andedValue, "ushrC");
+
                 break;
+            }
             case OR:
                 valueRef = LLVM.LLVMBuildOr(builder, lhs, rhs, "add");
                 break;

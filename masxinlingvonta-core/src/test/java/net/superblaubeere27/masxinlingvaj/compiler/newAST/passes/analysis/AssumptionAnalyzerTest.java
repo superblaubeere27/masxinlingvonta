@@ -87,15 +87,24 @@ class AssumptionAnalyzerTest {
     }
 
     private static class TsetAssumption extends Assumption {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            TsetAssumption that = (TsetAssumption) o;
+            return Objects.equals(value, that.value);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(value);
+        }
+
         private final String value;
 
         private TsetAssumption(String value) {
             this.value = value;
-        }
-
-        @Override
-        public boolean equivalent(Assumption other) {
-            return false;
         }
 
         @Override
@@ -112,13 +121,22 @@ class AssumptionAnalyzerTest {
         }
 
         @Override
-        public boolean equivalent(Assumption other) {
-            return false;
+        public String toString() {
+            return null;
         }
 
         @Override
-        public String toString() {
-            return null;
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            TestAssumption that = (TestAssumption) o;
+            return value == that.value;
+        }
+
+        @Override
+        public int hashCode() {
+            return value;
         }
     }
 }

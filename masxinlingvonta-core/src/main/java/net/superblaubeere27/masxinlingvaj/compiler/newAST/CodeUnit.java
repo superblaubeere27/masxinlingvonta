@@ -114,12 +114,12 @@ public abstract class CodeUnit implements FastGraphVertex, Opcode {
     }
 
     @Override
-    public int getNumericId() {
+    public int numericId() {
         return id;
     }
 
     @Override
-    public String getDisplayName() {
+    public String displayName() {
         return Integer.toString(id);
     }
 

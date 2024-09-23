@@ -55,7 +55,6 @@ public class DeadCodeRemover extends Pass {
         if (liveness.out(stmt.getBlock()).contains(arrayVar)) {
             return false;
         }
-
         var stmtIndex = stmt.getBlock().indexOf(stmt);
 
         var varUses = stmt.getBlock().getGraph().getLocals().uses.get(arrayVar);
@@ -138,9 +137,10 @@ public class DeadCodeRemover extends Pass {
                     continue;
                 }
 
-                if (isArrayDeadAfter(stmt, arrayVar.getLocal(), liveness, dominanceAnalyzer)) {
-                    transaction.removeStatementAndExtractSideEffects(stmt);
-                }
+                // TODO: This code is dysfunctional since it does not feature a working escape analysis.
+//                if (isArrayDeadAfter(stmt, arrayVar.getLocal(), liveness, dominanceAnalyzer)) {
+//                    transaction.removeStatementAndExtractSideEffects(stmt);
+//                }
             }
         }
     }

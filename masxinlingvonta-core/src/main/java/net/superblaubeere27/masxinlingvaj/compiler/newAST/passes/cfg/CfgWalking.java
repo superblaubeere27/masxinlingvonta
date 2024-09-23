@@ -157,7 +157,7 @@ public class CfgWalking {
                 } else if (stmt instanceof CopyPhiStmt) {
                     var actualArgument = ((CopyPhiStmt) stmt).getExpression().getArgument(from);
 
-                    snapshot.putLocalInfo(((CopyPhiStmt) stmt).getVariable().getLocal(), this.analyzer.processExpression(snapshot, actualArgument));
+                    snapshot.putLocalAssumption(((CopyPhiStmt) stmt).getVariable().getLocal(), this.analyzer.processExpression(snapshot, actualArgument));
 
                     // Remember which argument we would use as phi param
                     this.localReplacements.put(((CopyPhiStmt) stmt).getVariable().getLocal(), actualArgument);
@@ -173,7 +173,7 @@ public class CfgWalking {
                         return false;
                     }
 
-                    snapshot.putLocalInfo(copyVarStmt.getVariable().getLocal(), this.analyzer.processExpression(snapshot, actualArgument));
+                    snapshot.putLocalAssumption(copyVarStmt.getVariable().getLocal(), this.analyzer.processExpression(snapshot, actualArgument));
 
                     // Remember what this argument actually is
                     this.localReplacements.put(copyVarStmt.getVariable().getLocal(), actualArgument);

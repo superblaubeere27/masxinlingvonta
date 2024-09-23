@@ -90,7 +90,7 @@ public class BasicBlock implements FastGraphVertex, Collection<Stmt> {
     }
 
     @Override
-    public String getDisplayName() {
+    public String displayName() {
         return blockNameById(id);
     }
 
@@ -112,13 +112,13 @@ public class BasicBlock implements FastGraphVertex, Collection<Stmt> {
     }
 
     @Override
-    public int getNumericId() {
+    public int numericId() {
         return id;
     }
 
     @Override
     public String toString() {
-        return this.getDisplayName();
+        return this.displayName();
     }
 
     @Override

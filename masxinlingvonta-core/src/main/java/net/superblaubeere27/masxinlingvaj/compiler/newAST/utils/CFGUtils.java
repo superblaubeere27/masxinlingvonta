@@ -1,6 +1,5 @@
 package net.superblaubeere27.masxinlingvaj.compiler.newAST.utils;
 
-import net.superblaubeere27.masxinlingvaj.compiler.graph.FlowEdge;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.BasicBlock;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.ControlFlowGraph;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.Stmt;
@@ -12,7 +11,7 @@ public class CFGUtils {
     public static void blockToString(TabbedStringWriter sw, ControlFlowGraph cfg, BasicBlock b, int insn) {
         // sw.print("===#Block " + b.getId() + "(size=" + (b.size()) + ")===");
 //        sw.print(String.format("===#Block %s(size=%d, flags=%s)===", b.getDisplayName(), b.size(), Integer.toBinaryString(b.getFlags())));
-        sw.print(b.getDisplayName() + ":");
+        sw.print(b.displayName() + ":");
         sw.tab();
 
         Iterator<Stmt> it = b.iterator();

@@ -4,9 +4,12 @@ import com.google.common.collect.Streams;
 import com.google.common.html.HtmlEscapers;
 import net.superblaubeere27.masxinlingvaj.compiler.graph.FlowEdge;
 import net.superblaubeere27.masxinlingvaj.compiler.graph.FlowGraph;
+import net.superblaubeere27.masxinlingvaj.compiler.graph.algorithm.CycleDetectorOfTarjan;
 import net.superblaubeere27.masxinlingvaj.compiler.graph.algorithm.LT79Dom;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.PhiExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.VarExpr;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.LocalInfoSnapshot;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.LocalVariableAnalyzer;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches.BranchStmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches.ConditionalBranch;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.stmt.branches.ExceptionCheckStmt;
@@ -16,10 +19,13 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.ChainIterator;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.TabbedStringWriter;
 import net.superblaubeere27.masxinlingvaj.compiler.tree.CompilerMethod;
 
+import java.awt.*;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
+import java.util.List;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -269,10 +275,10 @@ public class ControlFlowGraph extends FlowGraph<BasicBlock, FlowEdge<BasicBlock>
         Set<Integer> usedIds = new HashSet<>();
 
         for (BasicBlock b : vertices()) {
-            if (!usedIds.add(b.getNumericId()))
+            if (!usedIds.add(b.numericId()))
                 throw new IllegalStateException("Id collision: " + b);
-            if (b.getNumericId() > maxId)
-                maxId = b.getNumericId();
+            if (b.numericId() > maxId)
+                maxId = b.numericId();
 
             if (getReverseEdges(b).size() == 0 && !getEntries().contains(b)) {
                 throw new IllegalStateException("dead incoming: " + b);
@@ -394,6 +400,44 @@ public class ControlFlowGraph extends FlowGraph<BasicBlock, FlowEdge<BasicBlock>
     }
 
     public void toGraphViz(PrintStream writer) {
+        LocalVariableAnalyzer analyzer = new LocalVariableAnalyzer(this);
+
+        var timeStarted = System.currentTimeMillis();
+        analyzer.analyze(LocalInfoSnapshot.create(), 512);
+        System.out.println("n = " + analyzer.counter + ", t = " + (System.currentTimeMillis() - timeStarted) + "ms");
+
+        var nanoTime = System.nanoTime();
+
+        var cycles = new CycleDetectorOfTarjan<>(this, this.getEntry()).getStronglyConnectedComponents();
+
+        System.out.println("time of cycle analysis = " + (System.nanoTime() - nanoTime) / 1000 + "us");
+
+        var nColors = cycles.stream().filter(x -> x.size() > 1).count() + 1;
+        var coloredByMap = new HashMap<BasicBlock, Color>();
+
+        int count = 1;
+
+        for (ArrayList<BasicBlock> cycle : cycles) {
+            int colorIdx;
+
+            if (cycle.size() == 1) {
+                colorIdx = 0;
+            } else {
+                colorIdx = count++;
+            }
+
+            var color = Color.getHSBColor((float) colorIdx / (float) nColors, 0.4F, 1.0F);
+
+            for (BasicBlock block : cycle) {
+                coloredByMap.put(block, color);
+            }
+        }
+
+        var map = analyzer.blockCounts;
+        var max = analyzer.blockCounts.values().stream().mapToInt(AtomicInteger::get).max().orElse(0);
+
+        System.out.println(map);
+
         writer.println("digraph cfg {");
         writer.println("\tnode [fontname=\"Courier\"];"); // Set the font to a monospaced font
 
@@ -403,7 +447,13 @@ public class ControlFlowGraph extends FlowGraph<BasicBlock, FlowEdge<BasicBlock>
 
             CFGUtils.blockToString(tsw, this, node, 0);
 
-            writer.printf("\tn%d [label=<<table border=\"0\"><tr><td>%d</td></tr><tr><td align=\"left\">%s</td></tr></table>>];\n", node.getNumericId(), node.getNumericId(), HtmlEscapers.htmlEscaper().escape(tsw.toString()).replace("\n", "<br/>"));
+            var atomicInt = map.get(node.numericId());
+            var counts = atomicInt == null ? 0 : atomicInt.get();
+
+//            var color = Color.getHSBColor(0.0F, ((float) counts / (float) max) * 0.8F, 1.0F);
+            var color = coloredByMap.get(node);
+
+            writer.printf("\tn%d [color=\"#%s\" style=\"filled\" label=<<table border=\"0\"><tr><td>%d</td></tr><tr><td align=\"left\">%s</td></tr></table>>];\n", node.numericId(), Integer.toHexString(color.getRGB() & 0xFFFFFF), node.numericId(), HtmlEscapers.htmlEscaper().escape(tsw.toString()).replace("\n", "<br/>"));
         }
 
         // Traverse the CFG and generate an edge for each CFG edge
@@ -422,11 +472,11 @@ public class ControlFlowGraph extends FlowGraph<BasicBlock, FlowEdge<BasicBlock>
                 }
 
                 for (int i = 0; i < branchStmt.getNextBasicBlocks().length; i++) {
-                    writer.printf("\tn%d -> n%d%s;\n", node.getNumericId(), branchStmt.getNextBasicBlocks()[i].getNumericId(), labelTexts == null ? "" : labelTexts[i]);
+                    writer.printf("\tn%d -> n%d%s;\n", node.numericId(), branchStmt.getNextBasicBlocks()[i].numericId(), labelTexts == null ? "" : labelTexts[i]);
                 }
             } else {
                 for (FlowEdge<BasicBlock> edge : edges) {
-                    writer.printf("\tn%d -> n%d;\n", edge.src().getNumericId(), edge.dst().getNumericId());
+                    writer.printf("\tn%d -> n%d;\n", edge.src().numericId(), edge.dst().numericId());
                 }
             }
         }

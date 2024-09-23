@@ -3,6 +3,8 @@ package net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.local
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.compare.IntegerCompareExpr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.Assumption;
 
+import java.util.Objects;
+
 /**
  * Basically says <code>subject operator rhs</code>.
  */
@@ -16,10 +18,17 @@ public class NumberRelation<N extends Number> extends Assumption {
     }
 
     @Override
-    public boolean equivalent(Assumption other) {
-        return other instanceof NumberRelation<?> numberRelation && this.rhs.equals(numberRelation.rhs) && this.operator == numberRelation.operator;
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        NumberRelation<?> that = (NumberRelation<?>) o;
+        return Objects.equals(rhs, that.rhs) && operator == that.operator;
     }
 
+    @Override
+    public int hashCode() {
+        return Objects.hash(rhs, operator);
+    }
 
     public IntegerCompareExpr.Operator getOperator() {
         return operator;

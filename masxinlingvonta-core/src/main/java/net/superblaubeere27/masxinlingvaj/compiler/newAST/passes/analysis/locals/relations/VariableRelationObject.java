@@ -5,7 +5,7 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.Stmt;
 
 import java.util.Objects;
 
-public class VariableRelationObject extends RelationObject<Object> {
+public class VariableRelationObject<T> extends RelationObject<T> {
     private final Local variable;
     private final Stmt declaringStatement;
 
@@ -26,11 +26,13 @@ public class VariableRelationObject extends RelationObject<Object> {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
+        VariableRelationObject<?> that = (VariableRelationObject<?>) o;
+        return Objects.equals(variable, that.variable) && Objects.equals(declaringStatement, that.declaringStatement);
+    }
 
-        VariableRelationObject that = (VariableRelationObject) o;
-
-        if (!Objects.equals(variable, that.variable)) return false;
-        return declaringStatement == that.declaringStatement;
+    @Override
+    public int hashCode() {
+        return Objects.hash(variable, declaringStatement);
     }
 
     @Override

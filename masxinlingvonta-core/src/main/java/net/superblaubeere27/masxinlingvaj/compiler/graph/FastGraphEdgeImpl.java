@@ -26,13 +26,12 @@ public class FastGraphEdgeImpl<N extends FastGraphVertex> implements FastGraphEd
             return false;
         if (this == o)
             return true;
-        if (!(o instanceof FastGraphEdge))
+        if (!(o instanceof FastGraphEdge v))
             return false;
-        FastGraphEdge v = (FastGraphEdge) o;
 
         // assert consistency
-        assert ((v.src().getNumericId() == src.getNumericId()) == (v.src() == src));
-        assert ((v.dst().getNumericId() == dst.getNumericId()) == (v.dst() == dst));
+        assert ((v.src().numericId() == src.numericId()) == (v.src() == src));
+        assert ((v.dst().numericId() == dst.numericId()) == (v.dst() == dst));
 
         return v.src() == src && v.dst() == dst;
     }

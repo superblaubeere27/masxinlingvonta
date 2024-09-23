@@ -1,142 +1,100 @@
 package net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.relations;
 
+import com.google.common.collect.HashMultimap;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.Assumption;
 
 import javax.annotation.Nonnull;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class LinkedAssumptions extends Assumption {
     private final LinkType linkType;
-    private final List<Assumption> assumptionList;
+    private final HashMultimap<AssumptionKey, Assumption> assumptions;
 
-    private LinkedAssumptions(LinkType linkType, List<Assumption> assumptionList) {
+    private LinkedAssumptions(LinkType linkType, HashMultimap<AssumptionKey, Assumption> assumptions) {
         this.linkType = linkType;
-        this.assumptionList = assumptionList;
+        this.assumptions = assumptions;
     }
 
     /**
      * Or linkage between assumptions (either one of the assumption applies)
      */
     public static Assumption or(@Nonnull Assumption... assumptions) {
-        var mergedAssumptions = new ArrayList<Assumption>(assumptions.length);
+        var mergedAssumptions = HashMultimap.<AssumptionKey, Assumption>create();
 
         for (Assumption assumption : assumptions) {
             if (assumption == null)
                 throw new IllegalArgumentException("Assumptions cannot be null!");
 
-            // If the assumption is not a linked OR assumption, we just pass it through
-            if (!(assumption instanceof LinkedAssumptions linkedAssumptions) || linkedAssumptions.linkType != LinkType.OR) {
-                // If an assumption is a NO_ASSUMPTION, all other assumptions cannot be applied for certain, so we can
-                // just discard this or linkage.
-                if (assumption == NoAssumption.INSTANCE) {
-                    return NoAssumption.INSTANCE;
-                }
-
-                addIfNew(mergedAssumptions, assumption);
+            // Unwind OR linkages (a OR (b OR C) -> a OR b or C)
+            if (assumption instanceof LinkedAssumptions linkedAssumptions && linkedAssumptions.linkType == LinkType.OR) {
+                mergedAssumptions.putAll(linkedAssumptions.assumptions);
 
                 continue;
             }
 
-            // If it is an OR linkage, unwind the assumptions
-            for (Assumption nestedAssumption : linkedAssumptions.assumptionList) {
-                if (nestedAssumption == NoAssumption.INSTANCE) {
-                    return NoAssumption.INSTANCE;
-                }
+            mergedAssumptions.put(assumption.getKey(), assumption);
+        }
 
-                addIfNew(mergedAssumptions, nestedAssumption);
-            }
+        // If any of the assumptions is nothing, it means that we know exactly nothing.
+        if (mergedAssumptions.containsKey(NoAssumption.INSTANCE.getKey())) {
+            return NoAssumption.INSTANCE;
         }
 
         if (mergedAssumptions.size() == 1) {
-            return mergedAssumptions.get(0);
+            return mergedAssumptions.values().stream().findFirst().orElseThrow();
         }
 
         return new LinkedAssumptions(LinkType.OR, mergedAssumptions);
     }
 
     /**
-     * And linkage between assumptions (all assumptions apply at the same time)
+     * And linkage between assumptions (all assumptions apply at the same time).
+     * Returns the minimal representation of the given assumption.
      */
     public static Assumption and(Assumption... assumptions) {
-        var resultAssumptions = new ArrayList<Assumption>(assumptions.length);
+        var result = HashMultimap.<AssumptionKey, Assumption>create();
 
         for (Assumption assumption : assumptions) {
-            if (assumption == null)
-                throw new IllegalArgumentException("Assumptions cannot be null!");
+            if (assumption instanceof LinkedAssumptions linkedAssumptions && linkedAssumptions.getLinkType() == LinkType.AND) {
+                result.putAll(linkedAssumptions.assumptions);
 
-            addAssumptionToAndLink(resultAssumptions, assumption);
-        }
-
-        // Last step: remapping assumptions (-> Remove assumptions that have become obsolete)
-        remapAssumptionListForAnd(resultAssumptions);
-
-        if (resultAssumptions.size() == 1) {
-            return resultAssumptions.get(0);
-        }
-
-        return new LinkedAssumptions(LinkType.AND, resultAssumptions);
-    }
-
-    /**
-     * Compares every assumption in the list to every other assumption in that list and remaps them
-     */
-    private static void remapAssumptionListForAnd(ArrayList<Assumption> resultAssumptions) {
-        for (int i = 0; i < resultAssumptions.size(); i++) {
-            var assumption = resultAssumptions.get(i);
-
-            for (int j = 0; j < resultAssumptions.size(); j++) {
-                if (j == i)
-                    continue;
-
-                var otherAssumption = resultAssumptions.get(j);
-
-                var remappedAssumption = assumption.remapAssumptionForAnd(otherAssumption);
-
-                // If the assumption has updated due to the other assumption being present, replace it
-                if (remappedAssumption.isPresent()) {
-                    assumption = remappedAssumption.get();
-
-                    // If the assumption has become a no-assumption, there will be no more updates to it.
-                    if (assumption == NoAssumption.INSTANCE) {
-                        break;
-                    }
-                }
+                continue;
             }
 
-            resultAssumptions.set(i, assumption);
+            result.put(assumption.getKey(), assumption);
         }
 
-        // Remove all assumptions that have turned into no-assumptions
-        resultAssumptions.removeIf(x -> x == NoAssumption.INSTANCE);
-    }
+        var mappedOrValues = new ArrayList<Assumption>();
 
-    private static void addIfNew(ArrayList<Assumption> assumptions, Assumption newAssumption) {
-        // Is an equivalent assumption already in the list? If it is not, add it
-        if (assumptions.stream().anyMatch(x -> x.equivalent(newAssumption)))
-            return;
+        // This function shall yield the minimal representation of this assumption. Thus (a OR (b AND c)) AND c must be
+        // optimized to (a OR b) AND c. Since AND linkages were already spilled (s.a.) we only need to process OR values.
+        for (Iterator<Assumption> iterator = result.get(new LinkedAssumptionsKey(LinkType.OR)).iterator(); iterator.hasNext(); ) {
+            Assumption assumption = iterator.next();
 
-        assumptions.add(newAssumption);
-    }
+            var remapped = assumption.remapAssumption(childAssumption -> result.containsValue(childAssumption) ? NoAssumption.INSTANCE : null);
 
-    private static void addAssumptionToAndLink(ArrayList<Assumption> resultAssumptions, Assumption assumption) {
-        // Is an equivalent assumption already in the list? If it is not, add it
-        if (resultAssumptions.stream().anyMatch(x -> x.equivalent(assumption)))
-            return;
+            if (remapped != null) {
+                mappedOrValues.add(remapped);
 
-        if (assumption == NoAssumption.INSTANCE)
-            return;
-
-        if (assumption instanceof LinkedAssumptions linkedAssumption && linkedAssumption.getLinkType() == LinkType.AND) {
-            for (Assumption inner : linkedAssumption.getAssumptionList()) {
-                addAssumptionToAndLink(resultAssumptions, inner);
+                iterator.remove();
             }
-        } else {
-            resultAssumptions.add(assumption);
         }
+
+        for (Assumption mappedOrValue : mappedOrValues) {
+            result.put(mappedOrValue.getKey(), mappedOrValue);
+        }
+
+        result.removeAll(NoAssumption.INSTANCE.getKey());
+
+        if (result.isEmpty()) {
+            return NoAssumption.INSTANCE;
+        } else if (result.size() == 1) {
+            return result.values().stream().findFirst().orElseThrow();
+        }
+
+        return new LinkedAssumptions(LinkType.AND, result);
     }
 
     public LinkType getLinkType() {
@@ -144,86 +102,82 @@ public class LinkedAssumptions extends Assumption {
     }
 
     @Override
-    public Assumption merge(Assumption other) {
-        return or(this, other);
-    }
-
-    @Override
-    public boolean equivalent(Assumption other) {
-        if (!(other instanceof LinkedAssumptions otherLinkedAssumptions))
-            return false;
-
-        if (this.linkType != otherLinkedAssumptions.linkType)
-            return false;
-
-        if (this.assumptionList.size() != otherLinkedAssumptions.assumptionList.size())
-            return false;
-
-        // Is there for every assumption in this object an equivalent assumption in the other
-        O:
-        for (Assumption assumption : this.assumptionList) {
-            for (Assumption otherAssumption : otherLinkedAssumptions.assumptionList) {
-                if (assumption.equivalent(otherAssumption))
-                    continue O;
-            }
-
-            return false;
-        }
-
-        // Link type is equivalent, both have same amount of assumptions and contain similar stuff
-        return true;
-    }
-
-    @Override
-    public Optional<Assumption> remapAssumptionForAnd(Assumption other) {
-        ArrayList<Assumption> output = new ArrayList<>();
-
-        boolean changed = false;
-
-        for (Assumption assumption : this.assumptionList) {
-            var remappedOptional = assumption.remapAssumptionForAnd(other);
-
-            if (remappedOptional.isPresent()) {
-                changed = true;
-
-                if (remappedOptional.get() == NoAssumption.INSTANCE) {
-                    switch (this.linkType) {
-                        case AND -> {
-                            continue;
-                        }
-                        case OR -> {
-                            return Optional.of(NoAssumption.INSTANCE);
-                        }
-                    }
-                }
-
-                addIfNew(output, remappedOptional.get());
-            } else {
-                addIfNew(output, assumption);
-            }
-        }
-
-        if (output.size() == 0) {
-            return Optional.of(NoAssumption.INSTANCE);
-        } else if (output.size() == 1) {
-            return Optional.of(output.get(0));
-        }
-
-        return changed ? Optional.of(new LinkedAssumptions(this.linkType, output)) : Optional.empty();
-    }
-
-    @Override
     public String toString() {
-        return "(LINK:\n\t- " + this.linkType + " " + this.assumptionList.stream().map(assumption -> assumption.toString().replace("\n", "\n\t")).collect(Collectors.joining("\n\t- " + this.linkType.toString() + " ")) + ")";
+        return "(LINK:\n\t- " + this.linkType + " " + this.assumptions.values().stream().map(assumption -> assumption.toString().replace("\n", "\n\t")).collect(Collectors.joining("\n\t- " + this.linkType.toString() + " ")) + ")";
     }
 
+    @Override
+    public Assumption remapAssumption(Function<Assumption, Assumption> remapper) {
+        var target = new ArrayList<Assumption>();
+        var changed = false;
 
-    public List<Assumption> getAssumptionList() {
-        return Collections.unmodifiableList(assumptionList);
+        for (Assumption assumption : this.assumptions.values()) {
+            var remapped = assumption.remapAssumption(remapper);
+
+            if (remapped != null) {
+                target.add(remapped);
+                changed = true;
+            } else {
+                target.add(assumption);
+            }
+        }
+
+        if (changed) {
+            return switch (this.linkType) {
+                case AND -> and(target.toArray(Assumption[]::new));
+                case OR -> or(target.toArray(Assumption[]::new));
+            };
+        } else {
+            return this;
+        }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        LinkedAssumptions that = (LinkedAssumptions) o;
+        return linkType == that.linkType && Objects.equals(assumptions, that.assumptions);
+    }
+
+    @Override
+    public AssumptionKey getKey() {
+        return new LinkedAssumptionsKey(this.linkType);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(linkType, assumptions);
+    }
+
+    public Collection<Assumption> getInnerAssumptions() {
+        return Collections.unmodifiableCollection(this.assumptions.values());
     }
 
     public enum LinkType {
         AND,
         OR
+    }
+
+    private static class LinkedAssumptionsKey extends AssumptionKey {
+        private final LinkType linkType;
+
+        private LinkedAssumptionsKey(LinkType linkType) {
+            this.linkType = linkType;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            LinkedAssumptionsKey that = (LinkedAssumptionsKey) o;
+            return linkType == that.linkType;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(LinkedAssumptionsKey.class, linkType);
+        }
     }
 }

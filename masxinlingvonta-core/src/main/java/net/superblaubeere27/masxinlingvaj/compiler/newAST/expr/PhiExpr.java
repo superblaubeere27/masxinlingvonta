@@ -95,7 +95,7 @@ public class PhiExpr extends Expr {
 
     @Override
     public void toString(TabbedStringWriter printer) {
-        printer.print("phi " + this.arguments.entrySet().stream().map(entry -> "[" + entry.getKey().getDisplayName() + ", " + entry.getValue() + "]").collect(Collectors.joining(", ")));
+        printer.print("phi " + this.arguments.entrySet().stream().map(entry -> "[" + entry.getKey().displayName() + ", " + entry.getValue() + "]").collect(Collectors.joining(", ")));
     }
 
     @Override

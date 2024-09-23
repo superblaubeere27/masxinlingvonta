@@ -2,7 +2,7 @@ package net.superblaubeere27.masxinlingvaj.compiler.graph;
 
 public interface FastGraphVertex {
     @Deprecated
-    int getNumericId();
+    int numericId();
 
-    String getDisplayName();
+    String displayName();
 }

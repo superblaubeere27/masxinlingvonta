@@ -3,6 +3,7 @@ package net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.local
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.AssumptionAnalyzer;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.relations.LinkedAssumptions;
 
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -11,26 +12,6 @@ public abstract class Assumption {
 
     public Assumption merge(Assumption other) {
         return LinkedAssumptions.or(this, other);
-    }
-
-    public abstract boolean equivalent(Assumption other);
-
-    // TODO is this method used? yes, is it?
-
-    /**
-     * This assumption is x and there is an assumption linkage like this: x OR y.
-     * Now a new assumption (z) will be added with an AND linkage: (x OR y) AND z.
-     * This method now remaps assumption x to make sense in the context of the z-assumption.
-     * <p/>
-     * If x is the same or contradicts z, this function returns Optional(NoAssumption).
-     * If x can be simplified due to z, this function returns Optional(new assumption)
-     * If x and z mean different things, this function will return Optional.empty().
-     */
-    public Optional<Assumption> remapAssumptionForAnd(Assumption other) {
-        if (other.equivalent(this))
-            return Optional.of(NoAssumption.INSTANCE);
-
-        return Optional.empty();
     }
 
     public final boolean canBeAssumed(Predicate<Assumption> leafPredicate) {
@@ -42,7 +23,32 @@ public abstract class Assumption {
     }
 
     @Override
+    public abstract boolean equals(Object obj);
+
+    @Override
+    public abstract int hashCode();
+
+    @Override
     public abstract String toString();
+
+    /**
+     * Remaps an assumption.
+     *
+     * @param remapper returns a remapped assumption. If the assumption remains unchanged, this function should return
+     *                 null.
+     * @return null if the assumption remains unchanged.
+     */
+    public Assumption remapAssumption(Function<Assumption, Assumption> remapper) {
+        return remapper.apply(this);
+    }
+
+    /**
+     * Keys to group the assumptions by. If another assumption has a different key, both assumptions are completely
+     * unrelated.
+     */
+    public AssumptionKey getKey() {
+        return new ClassAssumptionKey(this.getClass());
+    }
 
     public static class NoAssumption extends Assumption {
         public static final NoAssumption INSTANCE = new NoAssumption();
@@ -50,19 +56,78 @@ public abstract class Assumption {
         private NoAssumption() {
         }
 
+        @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
         @Override
-        public boolean equivalent(Assumption other) {
-            return other == INSTANCE;
+        public boolean equals(Object obj) {
+            return obj == INSTANCE;
         }
 
         @Override
-        public Optional<Assumption> remapAssumptionForAnd(Assumption other) {
-            return Optional.empty();
+        public int hashCode() {
+            return NoAssumption.class.hashCode();
         }
 
         @Override
         public String toString() {
             return "???";
+        }
+    }
+
+    public abstract static class AssumptionKey {
+        @Override
+        public abstract int hashCode();
+
+        @Override
+        public abstract boolean equals(Object obj);
+    }
+
+    /**
+     * Default implementation
+     */
+    protected static final class ClassAssumptionKey extends AssumptionKey {
+        private final Class<? extends Assumption> parentClass;
+
+        public ClassAssumptionKey(Class<? extends Assumption> parentClass) {
+            this.parentClass = parentClass;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            ClassAssumptionKey that = (ClassAssumptionKey) o;
+            return Objects.equals(parentClass, that.parentClass);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(parentClass);
+        }
+    }
+
+    /**
+     * Default implementation
+     */
+    protected static final class SingleKeyAssumptionKey extends AssumptionKey {
+        private final Class<? extends Assumption> parentClass;
+        private final Object key;
+
+        public SingleKeyAssumptionKey(Class<? extends Assumption> parentClass, Object key) {
+            this.parentClass = parentClass;
+            this.key = key;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            SingleKeyAssumptionKey that = (SingleKeyAssumptionKey) o;
+            return Objects.equals(parentClass, that.parentClass) && Objects.equals(key, that.key);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(parentClass, key);
         }
     }
 }

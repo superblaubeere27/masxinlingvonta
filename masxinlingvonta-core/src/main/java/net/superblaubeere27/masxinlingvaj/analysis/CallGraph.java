@@ -36,12 +36,12 @@ public final class CallGraph extends FastDirectedGraph<CallGraph.CallGraphMethod
         }
 
         @Override
-        public int getNumericId() {
+        public int numericId() {
             return this.id;
         }
 
         @Override
-        public String getDisplayName() {
+        public String displayName() {
             return this.method.toString();
         }
 

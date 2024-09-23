@@ -13,7 +13,7 @@ public class MLVTestFramework {
     }
 
     static HashMap<String, Integer> clearMilestones() {
-        var resultHashMap = new HashMap<String, Integer>();
+        HashMap<String, Integer> resultHashMap = new HashMap<String, Integer>();
 
         reachedMilestones.forEach((k, v) -> resultHashMap.put(k, v.get()));
 
@@ -27,7 +27,7 @@ public class MLVTestFramework {
     }
 
     public static String getCFGTextOfMethod(Class<?> clazz, String name) {
-        var prefix = clazz.getName().replace('.', '/') + "." + name;
+        String prefix = clazz.getName().replace('.', '/') + "." + name;
 
         return cfgs
                 .entrySet()

@@ -9,14 +9,14 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.expr.jvm.invoke.Invoke
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.AssumptionAnalyzer;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.AssumptionPredicates;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.LocalVariableAnalyzer;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.ObjectType;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.ObjectTypeAssumptionState;
+import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.analysis.locals.object.ObjectTypeAssumption;
 import net.superblaubeere27.masxinlingvaj.compiler.tree.ClassHierarchyBuilder;
 import net.superblaubeere27.masxinlingvaj.compiler.tree.CompilerIndex;
 import net.superblaubeere27.masxinlingvaj.compiler.tree.CompilerMethod;
 import net.superblaubeere27.masxinlingvaj.compiler.tree.MethodOrFieldName;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
 
 public class InvokeSpecificator extends Pass {
     private final CompilerIndex compilerIndex;
@@ -45,22 +45,22 @@ public class InvokeSpecificator extends Pass {
                     if (clazz == null)
                         continue;
 
-                    var impls = ClassHierarchyBuilder.getPossibleImplementationsCached(this.compilerIndex, clazz, new MethodOrFieldName(call.getTarget()));
+                    var impls = new ArrayList<>(ClassHierarchyBuilder.getPossibleImplementationsCached(this.compilerIndex, clazz, new MethodOrFieldName(call.getTarget())));
 
                     if (call.getInstanceExpr() instanceof VarExpr varExpr) {
-                        var assumption = analyzer.getStatementSnapshot(stmt).getOrCreateLocalInfo(varExpr.getLocal());
+                        var assumption = analyzer.getStatementSnapshot(stmt).getOrCreateLocalAssumption(varExpr.getLocal());
 
                         // Find out discrete values for object type
                         var typeAssumptions = AssumptionAnalyzer.extractActualValues(assumption, AssumptionPredicates.GET_TYPE_ASSUMPTION_PREDICATE_SET);
 
                         // If discrete values where found, filter by them
-                        for (ObjectTypeAssumptionState typeAssumption : typeAssumptions) {
+                        for (ObjectTypeAssumption typeAssumption : typeAssumptions) {
                             impls = filterByAssumptionState(typeAssumption, new MethodOrFieldName(call.getTarget()), impls);
                         }
                     }
 
                     // Check if the call can be turned into a more specific call
-                    if (impls == null || impls.size() != 1)
+                    if (impls.size() != 1)
                         continue;
 
                     var actualTarget = impls.get(0);
@@ -72,63 +72,50 @@ public class InvokeSpecificator extends Pass {
         }
     }
 
-    private List<CompilerMethod> filterByAssumptionStates(HashSet<ObjectTypeAssumptionState> objectTypeAssumptionStates, MethodOrFieldName methodOrFieldName, List<CompilerMethod> impls) {
-        HashSet<CompilerMethod> possibleImplementations = new HashSet<>();
-
-        for (ObjectTypeAssumptionState objectTypeAssumptionState : objectTypeAssumptionStates) {
-            possibleImplementations.addAll(filterByAssumptionState(objectTypeAssumptionState, methodOrFieldName, impls));
-        }
-
-        return new ArrayList<>(possibleImplementations);
-    }
-
     /**
-     * Sorts out all method implementations that are no candidates due to the assumption state {@code state}
+     * Sorts out all method implementations that are no candidates due to the assumption assumption {@code assumption}
      */
-    private List<CompilerMethod> filterByAssumptionState(ObjectTypeAssumptionState state, MethodOrFieldName methodName, List<CompilerMethod> currentCandidates) {
-        // Find out if we know the type
-        Optional<ObjectType> exactTypeIfKnown = state.getExactTypeIfKnown();
+    private ArrayList<CompilerMethod> filterByAssumptionState(ObjectTypeAssumption assumption, MethodOrFieldName methodName, ArrayList<CompilerMethod> candidates) {
+        // Arrays have weird ass logic which we don't want to handle yet.
+        if (!assumption.getType().isObject())
+            return candidates;
 
-        // If we know exactly which type it is, just do a vtable-lookup
-        if (exactTypeIfKnown.isPresent() && !exactTypeIfKnown.get().isArray()) {
-            var searchedClass = this.compilerIndex.getClass(exactTypeIfKnown.get().getTypeOfObject());
+        var typeOfObject = assumption.getType().getTypeOfObject();
+        var searchedClass = this.compilerIndex.getClass(typeOfObject);
 
-            if (searchedClass == null)
-                throw new IllegalStateException("Unable to find '" + exactTypeIfKnown.get().getTypeOfObject() + "'");
+        if (searchedClass == null)
+            throw new IllegalStateException("Unable to find '" + typeOfObject + "'");
 
-            return Collections.singletonList(ClassHierarchyBuilder.getVirtualImplementation(this.compilerIndex, searchedClass, methodName));
-        }
+        switch (assumption.getRelation()) {
+            case IS_EXACTLY -> {
+                // The actual implementation of the method
+                var virtualImplementation = ClassHierarchyBuilder.getVirtualImplementation(this.compilerIndex, searchedClass, methodName);
 
-        var remainingCandidates = new ArrayList<>(currentCandidates);
-
-        for (ObjectTypeAssumptionState.ObjectTypeInfo knownInfo : state.getKnownInfos()) {
-            // Arrays have weird ass logic
-            if (!knownInfo.type().isObject())
-                continue;
-
-            var typeName = knownInfo.type().getTypeOfObject();
-            var clazz = this.compilerIndex.getClass(typeName);
-
-
-            if (knownInfo.relation() != ObjectTypeAssumptionState.ObjectTypeRelation.IS_INSTANCE_OF) {
-                continue;
-            }
-
-            if (!knownInfo.inverted()) {
-                var virtualImplementation = ClassHierarchyBuilder.getVirtualImplementation(this.compilerIndex, clazz, methodName);
-                var implementations = ClassHierarchyBuilder.getPossibleImplementations(this.compilerIndex, clazz, methodName);
-
-                if (implementations.isEmpty() || virtualImplementation == null) {
-                    continue;
+                if (virtualImplementation == null) {
+                    return candidates;
                 }
 
-                remainingCandidates.removeIf(candidate -> !implementations.contains(candidate));
-            } else {
-                remainingCandidates.removeIf(candidate -> ClassHierarchyBuilder.isInstanceOf(candidate.getParent(), clazz));
+                if (assumption.isInverted()) {
+                    candidates.remove(virtualImplementation);
+                } else {
+                    return new ArrayList<>(Collections.singletonList(virtualImplementation));
+                }
+            }
+            case IS_INSTANCE_OF -> {
+                var clazz = this.compilerIndex.getClass(typeOfObject);
+
+                if (!assumption.isInverted()) {
+                    var implementations = ClassHierarchyBuilder.getPossibleImplementations(this.compilerIndex, clazz, methodName);
+
+                    candidates.removeIf(candidate -> !implementations.contains(candidate));
+
+                } else {
+                    candidates.removeIf(candidate -> ClassHierarchyBuilder.isInstanceOf(candidate.getParent(), clazz));
+                }
             }
         }
 
-        return remainingCandidates;
+        return candidates;
     }
 
 }

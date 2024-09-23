@@ -2,7 +2,6 @@ package net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.instSimplify;
 
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.BasicBlock;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.ControlFlowGraph;
-import net.superblaubeere27.masxinlingvaj.compiler.newAST.Expr;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.Stmt;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.BranchSimplifier;
 import net.superblaubeere27.masxinlingvaj.compiler.newAST.passes.Pass;
@@ -40,28 +39,15 @@ public class InstSimplifyPass extends Pass {
 
         for (BasicBlock vertex : cfg.vertices()) {
             for (Stmt stmt : vertex) {
-                for (Expr child : stmt.getChildren()) {
-                    simplifyAndReplaceExpressionRecursively(transaction, analyzer, child);
-                }
+                stmt.remapChildren(transaction, expr -> {
+                    var snapshot = analyzer.getStatementSnapshot(expr.getRootParent());
+
+                    return simplifier.simplifyExpression(snapshot, expr);
+                });
             }
         }
 
         transaction.apply();
-    }
-
-    private void simplifyAndReplaceExpressionRecursively(StatementTransaction transaction, LocalVariableAnalyzer analyzer, Expr expr) {
-        var replacement = simplifier.simplifyExpression(analyzer.getStatementSnapshot(expr.getRootParent()), expr);
-
-        // If a replacement was found, replace the expression and stop traversing
-        if (replacement != null) {
-            transaction.replaceExpr(expr, replacement);
-
-            return;
-        }
-
-        for (Expr child : expr.getChildren()) {
-            simplifyAndReplaceExpressionRecursively(transaction, analyzer, child);
-        }
     }
 
     private void simplifyWholeStatements(ControlFlowGraph cfg) {

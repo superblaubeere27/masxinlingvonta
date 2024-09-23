@@ -15,6 +15,7 @@ import net.superblaubeere27.masxinlingvaj.compiler.newAST.utils.StatementTransac
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.function.Predicate;
 
 public class ReuseLocalsPass extends Pass {
     private static boolean containsWrite(Stmt stmtBeforeStmt) {
@@ -71,6 +72,61 @@ public class ReuseLocalsPass extends Pass {
         transaction.apply();
     }
 
+    public static boolean isStatementBetween(Stmt stmt, Stmt defStmt, Predicate<Stmt> predicate) {
+        // Check if the statements before stmt write memory
+        for (Stmt stmtBeforeStmt : stmt.getBlock()) {
+            if (stmtBeforeStmt == stmt) {
+                break;
+            }
+
+            if (predicate.test(stmtBeforeStmt))
+                return true;
+        }
+        // Check if the statements before defStmt write memory
+        var statementsAfterDef = defStmt.getBlock().getStatements();
+
+        for (int i = statementsAfterDef.size() - 1; i >= 0; i--) {
+            var stmtAfterStmt = statementsAfterDef.get(i);
+
+            if (stmtAfterStmt == defStmt) {
+                break;
+            }
+
+            if (predicate.test(stmtAfterStmt))
+                return true;
+        }
+
+        var defBlock = defStmt.getBlock();
+
+        return isStatementBetween0(stmt.getBlock(), defBlock, defBlock.getGraph().createBitSet(), predicate, true);
+    }
+
+    private static boolean isStatementBetween0(BasicBlock dominated, BasicBlock dominator, GenericBitSet<BasicBlock> visitedBlocks, Predicate<Stmt> predicate, boolean first) {
+        if (dominator.equals(dominated)) {
+            return false;
+        }
+        if (!visitedBlocks.add(dominated)) {
+            return false;
+        }
+
+        // Check if any of the statements contains a write. If it is the first block, don't check because the check
+        // was already performed in blockWritesBetween.
+        if (!first) {
+            for (Stmt stmtBeforeStmt : dominated) {
+                if (predicate.test(stmtBeforeStmt))
+                    return true;
+            }
+        }
+
+        for (FlowEdge<BasicBlock> reverseEdge : dominated.getGraph().getReverseEdges(dominated)) {
+            if (isStatementBetween0(reverseEdge.src(), dominator, visitedBlocks, predicate, false)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private ReusableLocalManager.ReuseCandidate findValidCandidate(ControlFlowGraph cfg, LT79Dom<BasicBlock, FlowEdge<BasicBlock>> dom, HashSet<Local> replacedCandidates, CopyVarStmt stmt, List<ReusableLocalManager.ReuseCandidate> possibleCandidates) {
         for (ReusableLocalManager.ReuseCandidate possibleCandidate : possibleCandidates) {
             if (possibleCandidate.replacementValue() instanceof VarExpr declaringVar) {
@@ -85,88 +141,18 @@ public class ReuseLocalsPass extends Pass {
             var candidateDeclaringStatement = possibleCandidate.declaringStmt();
 
             // A candidate is not viable if it comes after the usage
-            if (!dominates(dom, stmt, candidateDeclaringStatement))
+            if (!candidateDeclaringStatement.dominates(dom, stmt))
                 continue;
 
             if (possibleCandidate.identifier().allowsMemoryWrite())
                 return possibleCandidate;
 
-            if (blockWritesBetween(stmt, candidateDeclaringStatement))
+            if (isStatementBetween(stmt, candidateDeclaringStatement, ReuseLocalsPass::containsWrite))
                 continue;
 
             return possibleCandidate;
         }
 
         return null;
-    }
-
-    /**
-     * Checks if <code>dominated</code> is dominated by <code>possibleDominator</code>
-     */
-    private boolean dominates(LT79Dom<BasicBlock, FlowEdge<BasicBlock>> dom, Stmt dominated, Stmt possibleDominator) {
-        var dominatorBlock = possibleDominator.getBlock();
-
-        if (!dom.getDominates(dominatorBlock).contains(dominated.getBlock()))
-            return false;
-
-        if (dominatorBlock == dominated.getBlock())
-            return dominatorBlock.indexOf(dominated) >= dominatorBlock.indexOf(possibleDominator);
-
-        return true;
-    }
-
-    private boolean blockWritesBetween(Stmt stmt, Stmt defStmt) {
-        // Check if the statements before stmt write memory
-        for (Stmt stmtBeforeStmt : stmt.getBlock()) {
-            if (stmtBeforeStmt == stmt) {
-                break;
-            }
-
-            if (containsWrite(stmtBeforeStmt))
-                return true;
-        }
-        // Check if the statements before defStmt write memory
-        var statementsAfterDef = defStmt.getBlock().getStatements();
-
-        for (int i = statementsAfterDef.size() - 1; i >= 0; i--) {
-            var stmtAfterStmt = statementsAfterDef.get(i);
-
-            if (stmtAfterStmt == defStmt) {
-                break;
-            }
-
-            if (containsWrite(stmtAfterStmt))
-                return true;
-        }
-
-        var defBlock = defStmt.getBlock();
-
-        return blockWritesBetween0(stmt.getBlock(), defBlock, defBlock.getGraph().createBitSet(), true);
-    }
-
-    private boolean blockWritesBetween0(BasicBlock dominated, BasicBlock dominator, GenericBitSet<BasicBlock> visitedBlocks, boolean first) {
-        if (dominator.equals(dominated)) {
-            return false;
-        }
-        if (!visitedBlocks.add(dominated)) {
-            return false;
-        }
-
-        // Check if any of the statements contains a write. If it is the first block, don't check because the check
-        // was already performed in blockWritesBetween.
-        if (!first) {
-            for (Stmt stmtBeforeStmt : dominated) {
-                if (containsWrite(stmtBeforeStmt))
-                    return true;
-            }
-        }
-
-        for (FlowEdge<BasicBlock> reverseEdge : dominated.getGraph().getReverseEdges(dominated)) {
-            if (blockWritesBetween0(reverseEdge.src(), dominator, visitedBlocks, false)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

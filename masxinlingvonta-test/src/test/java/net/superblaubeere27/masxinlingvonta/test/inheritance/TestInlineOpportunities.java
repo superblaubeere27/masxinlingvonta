@@ -30,19 +30,19 @@ public class TestInlineOpportunities {
         }
 
         if (!(s instanceof D)) {
-            return s.test() * 2;
+            return s.getVal() * 2;
         }
 
         if (s instanceof A) {
-            return s.test() * 7;
+            return s.getVal() * 7;
         }
 
         // This may not be inlined since s.test might be S.test or B.test
-        return s.test() * 17;
+        return s.getVal() * 17;
     }
 
     private static class S {
-        public int test() {
+        public int getVal() {
             return 3;
         }
     }
@@ -51,13 +51,13 @@ public class TestInlineOpportunities {
     }
 
     private static class A extends D {
-        public int test() {
+        public int getVal() {
             return 5;
         }
     }
 
     private static class B extends D {
-        public int test() {
+        public int getVal() {
             return 13;
         }
     }

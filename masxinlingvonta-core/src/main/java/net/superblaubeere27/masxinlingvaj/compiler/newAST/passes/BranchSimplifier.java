@@ -55,6 +55,10 @@ public class BranchSimplifier {
         }
 
         if (branch instanceof ExceptionCheckStmt exceptionCheckStmt) {
+            if (exceptionCheckStmt.getBlock().getGraph().getCompilerMethod().getNode().name.equals("test") && exceptionCheckStmt.getBlock().getGraph().size() == 4) {
+                "".length();
+            }
+
             var exceptionTarget = exceptionCheckStmt.getExceptionTarget();
             var okTarget = exceptionCheckStmt.getOkTarget();
 
